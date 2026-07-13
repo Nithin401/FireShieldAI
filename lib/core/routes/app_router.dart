@@ -12,6 +12,7 @@ import '../../presentation/features/device/add_device_screen.dart';
 import '../../presentation/features/device/device_details_screen.dart';
 import '../../presentation/features/map/map_screen.dart';
 import '../../presentation/features/notifications/notifications_screen.dart';
+import '../../presentation/features/reports/reports_screen.dart';
 import '../../presentation/features/settings/settings_screen.dart';
 import '../../presentation/features/settings/profile_screen.dart';
 
@@ -70,6 +71,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/map',
             name: 'map',
             builder: (context, state) => const MapScreen(),
+          ),
+          GoRoute(
+            path: '/reports',
+            name: 'reports',
+            builder: (context, state) => const ReportsScreen(),
           ),
           GoRoute(
             path: '/settings',

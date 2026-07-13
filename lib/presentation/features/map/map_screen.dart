@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:fireshield_app/presentation/providers/repository_providers.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -12,9 +13,45 @@ class MapScreen extends ConsumerStatefulWidget {
 
 class _MapScreenState extends ConsumerState<MapScreen> {
   GoogleMapController? mapController;
+  bool _isLocating = false;
 
   // Initial camera position (San Francisco for mock data)
-  final LatLng _center = const LatLng(37.7749, -122.4194);
+  LatLng _center = const LatLng(37.7749, -122.4194);
+
+  @override
+  void initState() {
+    super.initState();
+    _determinePosition();
+  }
+
+  Future<void> _determinePosition() async {
+    setState(() => _isLocating = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      if (permission == LocationPermission.deniedForever) return;
+
+      Position position = await Geolocator.getCurrentPosition();
+      final newCenter = LatLng(position.latitude, position.longitude);
+      
+      if (mounted) {
+        setState(() => _center = newCenter);
+        mapController?.animateCamera(CameraUpdate.newCameraPosition(
+          CameraPosition(target: newCenter, zoom: 14.0),
+        ));
+      }
+    } catch (e) {
+      debugPrint("Location error: $e");
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
@@ -50,20 +87,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             );
           }).toSet();
 
-          // Add Mock Fire Station and Hospital Markers
+          // Add Mock Fire Station and Police Station Markers around user
           markers.addAll([
             Marker(
               markerId: const MarkerId('fire_station_1'),
-              position: const LatLng(37.7800, -122.4200),
+              position: LatLng(_center.latitude + 0.005, _center.longitude - 0.005),
               infoWindow: const InfoWindow(
-                title: 'SF Fire Department Station 1',
+                title: 'Nearest Fire Department',
                 snippet: 'Emergency Response Unit',
               ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+            ),
+            Marker(
+              markerId: const MarkerId('police_1'),
+              position: LatLng(_center.latitude + 0.002, _center.longitude + 0.008),
+              infoWindow: const InfoWindow(
+                title: 'Local Police Station',
+                snippet: 'Law Enforcement / Emergency Dispatch',
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
             ),
             Marker(
               markerId: const MarkerId('hospital_1'),
-              position: const LatLng(37.7700, -122.4300),
+              position: LatLng(_center.latitude - 0.006, _center.longitude - 0.002),
               infoWindow: const InfoWindow(
                 title: 'General Hospital',
                 snippet: 'Emergency Room',
@@ -91,17 +137,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: FloatingActionButton(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
-                  onPressed: () {
-                    mapController?.animateCamera(
-                      CameraUpdate.newCameraPosition(
-                        CameraPosition(
-                          target: _center,
-                          zoom: 14.0,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.my_location),
+                  onPressed: _isLocating ? null : _determinePosition,
+                  child: _isLocating
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Icon(Icons.my_location),
                 ),
               ),
               // Legend overlay
@@ -121,7 +160,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         const SizedBox(height: 8),
                         _buildLegendItem(Colors.red, 'Offline/Alert'),
                         const SizedBox(height: 8),
-                        _buildLegendItem(Colors.blue, 'Fire Station'),
+                        _buildLegendItem(Colors.cyan, 'Fire Station'),
+                        const SizedBox(height: 8),
+                        _buildLegendItem(Colors.blue, 'Police Station'),
                         const SizedBox(height: 8),
                         _buildLegendItem(Colors.purple, 'Hospital'),
                       ],

@@ -33,6 +33,11 @@ class MainLayout extends StatelessWidget {
             label: 'Map',
           ),
           NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon: Icon(Icons.bar_chart),
+            label: 'Reports',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
@@ -50,8 +55,11 @@ class MainLayout extends StatelessWidget {
     if (location.startsWith('/map')) {
       return 2;
     }
-    if (location.startsWith('/settings')) {
+    if (location.startsWith('/reports')) {
       return 3;
+    }
+    if (location.startsWith('/settings')) {
+      return 4;
     }
     return 0; // Default to Dashboard
   }
@@ -68,6 +76,9 @@ class MainLayout extends StatelessWidget {
         context.go('/map');
         break;
       case 3:
+        context.go('/reports');
+        break;
+      case 4:
         context.go('/settings');
         break;
     }

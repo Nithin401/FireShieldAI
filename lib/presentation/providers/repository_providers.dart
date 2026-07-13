@@ -2,10 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fireshield_app/data/repositories/mock_auth_repository.dart';
 import 'package:fireshield_app/data/repositories/mock_device_repository.dart';
 import 'package:fireshield_app/data/repositories/mock_hardware_protocol_repository.dart';
+import 'package:fireshield_app/data/repositories/mock_report_repository.dart';
 import 'package:fireshield_app/domain/models/device_model.dart';
 import 'package:fireshield_app/domain/repositories/auth_repository.dart';
 import 'package:fireshield_app/domain/repositories/device_repository.dart';
 import 'package:fireshield_app/domain/repositories/hardware_protocol_repository.dart';
+import 'package:fireshield_app/domain/repositories/report_repository.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   // Return the mock implementation for now since Firebase isn't configured
@@ -18,6 +20,10 @@ final deviceRepositoryProvider = Provider<DeviceRepository>((ref) {
 
 final hardwareProtocolRepositoryProvider = Provider<HardwareProtocolRepository>((ref) {
   return MockHardwareProtocolRepository();
+});
+
+final reportRepositoryProvider = Provider<ReportRepository>((ref) {
+  return MockReportRepository();
 });
 
 final authStateProvider = StreamProvider<String?>((ref) {

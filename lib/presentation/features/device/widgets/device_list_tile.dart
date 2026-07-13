@@ -22,9 +22,7 @@ class DeviceListTile extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: device.isOnline 
-                ? AppColors.success.withOpacity(0.1) 
-                : Colors.grey.withOpacity(0.1),
+            color: device.isOnline ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(

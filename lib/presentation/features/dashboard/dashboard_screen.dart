@@ -41,7 +41,7 @@ class DashboardScreen extends ConsumerWidget {
       body: devicesAsync.when(
         data: (devices) {
           int offlineCount = devices.where((d) => !d.isOnline).length;
-          int onlineCount = devices.where((d) => d.isOnline).length;
+
           bool hasAlert = offlineCount > 0;
 
           return SafeArea(
