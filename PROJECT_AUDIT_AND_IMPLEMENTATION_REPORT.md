@@ -100,5 +100,13 @@ flutter run -d chrome
 
 ---
 
-## 4. Git Version Control Summary
+## 5. Day-Wise Implementation & Rationale Log
+A complete day-by-day record of **what was changed** and **why the changes were made** is maintained in:
+📁 **`D:\FireShieldAI\docs\CHANGELOG_AND_DAILY_HISTORY.md`**
+
+Every future update to the app, firmware, backend, or AI models will automatically log its date, modifications, engineering decisions, and status to that log.
+
+---
+
+## 6. Git Version Control Summary
 All changes in `D:\FireShieldAI` have been staged, committed, and pushed to the Git repository.
