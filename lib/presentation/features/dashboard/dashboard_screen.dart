@@ -14,13 +14,14 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FireShield Dashboard'),
+        title: const Text('FireShield AI Dashboard'),
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () {
+              ref.invalidate(devicesStreamProvider);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Syncing hardware via MQTT/BLE...')),
+                const SnackBar(content: Text('Syncing live telemetry & AI Risk Scores...')),
               );
             },
           ),
@@ -40,9 +41,25 @@ class DashboardScreen extends ConsumerWidget {
       ),
       body: devicesAsync.when(
         data: (devices) {
+          bool hasFireAlert = devices.any((d) => d.fireState == 'FIRE' || d.fireState == 'HIGH_RISK');
           int offlineCount = devices.where((d) => !d.isOnline).length;
 
-          bool hasAlert = offlineCount > 0;
+          Color statusColor = AppColors.success;
+          String statusTitle = 'System Secure';
+          String statusSubtitle = 'All zones normal. AI Risk Engine monitoring active.';
+          IconData statusIcon = Icons.check_circle_outline;
+
+          if (hasFireAlert) {
+            statusColor = AppColors.error;
+            statusTitle = 'CRITICAL FIRE ALERT';
+            statusSubtitle = 'Thermal abnormality or active fire detected! Check details immediately.';
+            statusIcon = Icons.local_fire_department;
+          } else if (offlineCount > 0) {
+            statusColor = AppColors.warning;
+            statusTitle = 'System Warning';
+            statusSubtitle = '$offlineCount device(s) offline. Please check connections.';
+            statusIcon = Icons.warning_amber_rounded;
+          }
 
           return SafeArea(
             child: SingleChildScrollView(
@@ -50,24 +67,20 @@ class DashboardScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status Banner
+                  // Real AI Status Banner
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: hasAlert 
-                            ? [AppColors.error, AppColors.error.withValues(alpha: 0.7)]
-                            : [AppColors.success, AppColors.success.withValues(alpha: 0.7)],
+                        colors: [statusColor, statusColor.withValues(alpha: 0.7)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: hasAlert 
-                              ? AppColors.error.withValues(alpha: 0.3)
-                              : AppColors.success.withValues(alpha: 0.3),
+                          color: statusColor.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -79,13 +92,13 @@ class DashboardScreen extends ConsumerWidget {
                         Row(
                           children: [
                             Icon(
-                              hasAlert ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                              statusIcon,
                               color: Colors.white,
                               size: 28,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              hasAlert ? 'System Alert' : 'System Secure',
+                              statusTitle,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
@@ -96,9 +109,7 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          hasAlert 
-                              ? '$offlineCount device(s) offline. Please check connections.'
-                              : 'No fire hazards detected in your zones.',
+                          statusSubtitle,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 14,
@@ -109,9 +120,9 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   
-                  // Devices Grid
+                  // Active Devices & AI Risk Cards
                   Text(
-                    'Active Zones',
+                    'Active Detection Zones',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -129,12 +140,24 @@ class DashboardScreen extends ConsumerWidget {
                     itemCount: devices.length,
                     itemBuilder: (context, index) {
                       final device = devices[index];
+                      Color cardColor = AppColors.success;
+                      if (device.fireState == 'FIRE' || device.fireState == 'HIGH_RISK') {
+                        cardColor = AppColors.error;
+                      } else if (device.fireState == 'WARNING') {
+                        cardColor = AppColors.warning;
+                      } else if (!device.isOnline) {
+                        cardColor = Colors.grey;
+                      }
+
                       return SensorCard(
-                        title: device.room,
-                        value: device.isOnline ? 'Online' : 'Offline',
-                        unit: '${device.batteryLevel}%',
-                        icon: device.isOnline ? Icons.sensors : Icons.warning,
-                        color: device.isOnline ? AppColors.success : AppColors.error,
+                        title: '${device.room} (${device.fireAngle}°)',
+                        value: '${device.riskScore.toStringAsFixed(0)}% Risk',
+                        unit: device.fireState,
+                        icon: device.fireState == 'FIRE' ? Icons.local_fire_department : Icons.sensors,
+                        color: cardColor,
+                        onTap: () {
+                          context.push('/devices/${device.id}');
+                        },
                       );
                     },
                   ),

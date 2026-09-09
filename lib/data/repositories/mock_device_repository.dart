@@ -8,15 +8,20 @@ class MockDeviceRepository implements DeviceRepository {
   final List<DeviceModel> _mockDatabase = [
     DeviceModel(
       id: 'dev_001',
-      name: 'Kitchen Smoke Detector',
+      name: 'Kitchen Fire Node (ESP1)',
       room: 'Kitchen',
       latitude: 37.7749,
       longitude: -122.4194,
-      firmwareVersion: 'v1.2.4',
+      firmwareVersion: 'v2.0-AI',
       isOnline: true,
       batteryLevel: 85,
       wifiSignalStrength: 90,
-      lastSync: DateTime.now().subtract(const Duration(minutes: 2)),
+      lastSync: DateTime.now().subtract(const Duration(seconds: 10)),
+      flameRaw: 820,
+      fireAngle: 90,
+      riskScore: 12.5,
+      fireState: 'SAFE',
+      responseStatus: 'IDLE',
     ),
     DeviceModel(
       id: 'dev_002',
@@ -26,9 +31,14 @@ class MockDeviceRepository implements DeviceRepository {
       longitude: -122.4194,
       firmwareVersion: 'v1.2.3',
       isOnline: true,
-      batteryLevel: 100, // plugged in
+      batteryLevel: 100,
       wifiSignalStrength: 75,
       lastSync: DateTime.now().subtract(const Duration(minutes: 5)),
+      flameRaw: 910,
+      fireAngle: 45,
+      riskScore: 5.0,
+      fireState: 'SAFE',
+      responseStatus: 'IDLE',
     ),
     DeviceModel(
       id: 'dev_003',
@@ -41,11 +51,15 @@ class MockDeviceRepository implements DeviceRepository {
       batteryLevel: 15,
       wifiSignalStrength: 0,
       lastSync: DateTime.now().subtract(const Duration(days: 1)),
+      flameRaw: 0,
+      fireAngle: 0,
+      riskScore: 0.0,
+      fireState: 'SAFE',
+      responseStatus: 'IDLE',
     ),
   ];
 
   MockDeviceRepository() {
-    // Initial emit
     Future.microtask(() => _deviceController.add(List.from(_mockDatabase)));
   }
 

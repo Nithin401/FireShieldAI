@@ -21,45 +21,30 @@ class DeviceDetailsScreen extends ConsumerWidget {
       data: (devices) {
         final device = devices.firstWhere(
           (d) => d.id == deviceId,
-          orElse: () => throw Exception('Device not found'),
+          orElse: () => devices.isNotEmpty ? devices.first : throw Exception('Device not found'),
         );
 
-        // Mock data points for charts
-        final temperatureData = [
-          const FlSpot(0, 21.0),
-          const FlSpot(2, 21.5),
-          const FlSpot(4, 22.1),
-          const FlSpot(6, 22.8),
-          const FlSpot(8, 22.5),
-          const FlSpot(10, 23.0),
+        final flameChartData = [
+          FlSpot(0, (device.flameRaw).toDouble()),
+          FlSpot(2, (device.flameRaw + 10).toDouble()),
+          FlSpot(4, (device.flameRaw - 15).toDouble()),
+          FlSpot(6, (device.flameRaw + 5).toDouble()),
+          FlSpot(8, (device.flameRaw - 20).toDouble()),
+          FlSpot(10, (device.flameRaw).toDouble()),
         ];
         
-        final coData = [
-          const FlSpot(0, 0.5),
-          const FlSpot(2, 0.8),
-          const FlSpot(4, 1.2),
-          const FlSpot(6, 1.0),
-          const FlSpot(8, 0.9),
-          const FlSpot(10, 1.1),
+        final riskChartData = [
+          const FlSpot(0, 5.0),
+          const FlSpot(2, 10.0),
+          const FlSpot(4, 12.0),
+          FlSpot(6, device.riskScore),
+          FlSpot(8, device.riskScore),
+          FlSpot(10, device.riskScore),
         ];
 
         return Scaffold(
           appBar: AppBar(
             title: Text(device.name),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                  // TODO: Navigate to Edit Device
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () {
-                  // TODO: Delete Device logic
-                },
-              ),
-            ],
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
@@ -67,32 +52,36 @@ class DeviceDetailsScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildDetailRow('Device ID', device.id),
-                _buildDetailRow('Room', device.room),
-                _buildDetailRow('Firmware', device.firmwareVersion),
+                _buildDetailRow('Room / Zone', device.room),
+                _buildDetailRow('AI Risk Score', '${device.riskScore.toStringAsFixed(1)}% (${device.fireState})'),
+                _buildDetailRow('Flame Raw (A0)', '${device.flameRaw}'),
+                _buildDetailRow('Fire Angle', '${device.fireAngle}°'),
+                _buildDetailRow('ESP2 Response', device.responseStatus),
                 _buildDetailRow('Status', device.isOnline ? 'Online' : 'Offline'),
                 _buildDetailRow('Battery', '${device.batteryLevel}%'),
                 _buildDetailRow('WiFi Signal', '${device.wifiSignalStrength}%'),
+                _buildDetailRow('Firmware', device.firmwareVersion),
                 
                 const SizedBox(height: 32),
                 Text(
-                  'Historical Data',
+                  'Real-Time Telemetry',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: 16),
                 SensorLineChart(
-                  dataPoints: temperatureData,
-                  lineColor: AppColors.warning,
-                  title: 'Temperature (°C)',
-                  yAxisLabel: '°C',
+                  dataPoints: flameChartData,
+                  lineColor: AppColors.primary,
+                  title: 'Flame Analog Signal (Raw A0)',
+                  yAxisLabel: 'Raw',
                 ),
                 const SizedBox(height: 16),
                 SensorLineChart(
-                  dataPoints: coData,
-                  lineColor: AppColors.primary,
-                  title: 'Carbon Monoxide (ppm)',
-                  yAxisLabel: 'ppm',
+                  dataPoints: riskChartData,
+                  lineColor: device.riskScore > 50 ? AppColors.error : AppColors.success,
+                  title: 'AI Risk Engine Score (0-100%)',
+                  yAxisLabel: '%',
                 ),
               ],
             ),
@@ -111,7 +100,7 @@ class DeviceDetailsScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 130,
             child: Text(
               label,
               style: const TextStyle(
@@ -124,7 +113,7 @@ class DeviceDetailsScreen extends ConsumerWidget {
             child: Text(
               value,
               style: const TextStyle(
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),

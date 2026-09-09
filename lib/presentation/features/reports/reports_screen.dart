@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:fireshield_app/core/theme/app_colors.dart';
 import 'package:fireshield_app/presentation/common/widgets/animated_card.dart';
-import 'package:fireshield_app/presentation/common/widgets/primary_button.dart';
 import 'package:fireshield_app/presentation/features/reports/providers/report_providers.dart';
 import 'package:fireshield_app/presentation/providers/repository_providers.dart';
 

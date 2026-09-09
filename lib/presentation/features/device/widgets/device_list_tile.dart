@@ -42,6 +42,22 @@ class DeviceListTile extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
+                const Icon(Icons.thermostat, size: 14, color: AppColors.error),
+                const SizedBox(width: 4),
+                Text('${device.ambientTemperature.toStringAsFixed(1)}°C'),
+                const SizedBox(width: 12),
+                const Icon(Icons.wb_sunny, size: 14, color: Colors.orange),
+                const SizedBox(width: 4),
+                Text('IR: ${device.irTemperature.toStringAsFixed(1)}°C'),
+                const SizedBox(width: 12),
+                const Icon(Icons.water_drop, size: 14, color: AppColors.info),
+                const SizedBox(width: 4),
+                Text('${device.ambientHumidity.toStringAsFixed(0)}%'),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
                 Icon(
                   device.batteryLevel > 20 
                       ? Icons.battery_full 
