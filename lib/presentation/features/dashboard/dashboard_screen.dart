@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fireshield_app/core/theme/app_colors.dart';
 import 'package:fireshield_app/presentation/providers/repository_providers.dart';
+import 'package:fireshield_app/presentation/features/notifications/providers/notification_providers.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/sensor_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -11,6 +12,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final devicesAsync = ref.watch(devicesStreamProvider);
+    final notifications = ref.watch(mockNotificationsProvider);
+    final unreadCriticalCount = notifications.where((n) => !n.isRead && n.severity == 'critical').length;
 
     return Scaffold(
       appBar: AppBar(
@@ -20,13 +23,20 @@ class DashboardScreen extends ConsumerWidget {
             icon: const Icon(Icons.sync),
             onPressed: () {
               ref.invalidate(devicesStreamProvider);
+              ref.invalidate(notificationsStreamProvider);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Syncing live telemetry & AI Risk Scores...')),
               );
             },
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
+            icon: unreadCriticalCount > 0
+                ? Badge.count(
+                    count: unreadCriticalCount,
+                    backgroundColor: AppColors.error,
+                    child: const Icon(Icons.notifications_active),
+                  )
+                : const Icon(Icons.notifications_outlined),
             onPressed: () {
               context.push('/notifications');
             },
@@ -52,7 +62,7 @@ class DashboardScreen extends ConsumerWidget {
           if (hasFireAlert) {
             statusColor = AppColors.error;
             statusTitle = 'CRITICAL FIRE ALERT';
-            statusSubtitle = 'Thermal abnormality or active fire detected! Check details immediately.';
+            statusSubtitle = 'Thermal abnormality or active fire detected! Tap to inspect emergency alerts.';
             statusIcon = Icons.local_fire_department;
           } else if (offlineCount > 0) {
             statusColor = AppColors.warning;
@@ -67,55 +77,64 @@ class DashboardScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Real AI Status Banner
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [statusColor, statusColor.withValues(alpha: 0.7)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: statusColor.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  // Real AI Status Banner (Tappable for immediate emergency navigation)
+                  InkWell(
+                    onTap: () {
+                      context.push('/notifications');
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [statusColor, statusColor.withValues(alpha: 0.7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              statusIcon,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              statusTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          statusSubtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 14,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: statusColor.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                statusIcon,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  statusTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            statusSubtitle,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -128,6 +147,7 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                   ),
                   const SizedBox(height: 16),
+
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

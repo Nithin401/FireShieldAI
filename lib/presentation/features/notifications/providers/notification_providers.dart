@@ -1,41 +1,39 @@
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fireshield_app/domain/models/notification_model.dart';
+import 'package:fireshield_app/domain/repositories/notification_repository.dart';
+import 'package:fireshield_app/presentation/providers/repository_providers.dart';
 
-part 'notification_providers.g.dart';
+export 'package:fireshield_app/presentation/providers/repository_providers.dart'
+    show notificationsStreamProvider, notificationRepositoryProvider;
 
-@riverpod
-class MockNotifications extends _$MockNotifications {
+/// State notifier managing live FireShield AI alerts and acknowledgement states
+class NotificationNotifier extends Notifier<List<NotificationModel>> {
+  late final NotificationRepository _repository;
+
   @override
   List<NotificationModel> build() {
-    return [
-      NotificationModel(
-        id: 'notif_1',
-        title: 'Smoke Detected',
-        message: 'Elevated smoke levels detected in Kitchen Smoke Detector.',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-        isRead: false,
-        severity: 'critical',
-      ),
-      NotificationModel(
-        id: 'notif_2',
-        title: 'Low Battery',
-        message: 'Lobby Fire Alarm battery is below 20%. Please replace soon.',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        isRead: false,
-        severity: 'warning',
-      ),
-      NotificationModel(
-        id: 'notif_3',
-        title: 'System Update',
-        message: 'Firmware v1.2.4 successfully installed on Kitchen Smoke Detector.',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        isRead: true,
-        severity: 'info',
-      ),
-    ];
+    _repository = ref.watch(notificationRepositoryProvider);
+    ref.listen<AsyncValue<List<NotificationModel>>>(notificationsStreamProvider, (previous, next) {
+      next.whenData((data) {
+        state = data;
+      });
+    });
+    return [];
   }
 
-  void markAllAsRead() {
+  Future<void> markAllAsRead() async {
     state = state.map((n) => n.copyWith(isRead: true)).toList();
+    await _repository.markAllAsRead();
+  }
+
+  Future<void> acknowledge(String id) async {
+    state = state.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList();
+    await _repository.acknowledgeNotification(id);
   }
 }
+
+/// Provider consumed by NotificationsScreen and Dashboard
+final mockNotificationsProvider =
+    NotifierProvider<NotificationNotifier, List<NotificationModel>>(NotificationNotifier.new);
+
+
