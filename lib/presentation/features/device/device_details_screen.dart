@@ -54,6 +54,8 @@ class DeviceDetailsScreen extends ConsumerWidget {
                 _buildDetailRow('Device ID', device.id),
                 _buildDetailRow('Room / Zone', device.room),
                 _buildDetailRow('AI Risk Score', '${device.riskScore.toStringAsFixed(1)}% (${device.fireState})'),
+                _buildDetailRow('Temperature', '${device.ambientTemperature.toStringAsFixed(1)} °C'),
+                _buildDetailRow('Humidity', '${device.ambientHumidity.toStringAsFixed(1)} %'),
                 _buildDetailRow('Flame Raw (A0)', '${device.flameRaw}'),
                 _buildDetailRow('Fire Angle', '${device.fireAngle}°'),
                 _buildDetailRow('ESP2 Response', device.responseStatus),
@@ -61,6 +63,30 @@ class DeviceDetailsScreen extends ConsumerWidget {
                 _buildDetailRow('Battery', '${device.batteryLevel}%'),
                 _buildDetailRow('WiFi Signal', '${device.wifiSignalStrength}%'),
                 _buildDetailRow('Firmware', device.firmwareVersion),
+                
+                const SizedBox(height: 24),
+                Center(
+                  child: Column(
+                    children: [
+                      Text('Aim Direction Radar (${device.fireAngle}°)', style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey, width: 2, style: BorderStyle.solid),
+                        ),
+                        child: Center(
+                          child: Transform.rotate(
+                            angle: (device.fireAngle - 90) * 3.1415926535 / 180,
+                            child: const Icon(Icons.navigation, size: 36, color: Colors.redAccent),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 
                 const SizedBox(height: 32),
                 Text(

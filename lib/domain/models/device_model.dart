@@ -61,8 +61,8 @@ class DeviceModel {
       lastSync: json['lastSync'] != null 
           ? DateTime.tryParse(json['lastSync'] as String) ?? DateTime.now()
           : DateTime.now(),
-      ambientTemperature: (json['ambientTemperature'] as num?)?.toDouble() ?? 25.0,
-      ambientHumidity: (json['ambientHumidity'] as num?)?.toDouble() ?? 50.0,
+      ambientTemperature: (json['ambientTemperature'] as num?)?.toDouble() ?? (json['tempC'] as num?)?.toDouble() ?? 25.0,
+      ambientHumidity: (json['ambientHumidity'] as num?)?.toDouble() ?? (json['humidity'] as num?)?.toDouble() ?? 50.0,
       irTemperature: (json['irTemperature'] as num?)?.toDouble() ?? 25.0,
       preciseTemperature: (json['preciseTemperature'] as num?)?.toDouble() ?? 25.0,
       hasThermalAbnormality: json['hasThermalAbnormality'] as bool? ?? false,
