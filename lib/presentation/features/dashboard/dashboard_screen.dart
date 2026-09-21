@@ -11,6 +11,8 @@ import 'package:fireshield_app/presentation/features/dashboard/widgets/direction
 import 'package:fireshield_app/presentation/features/dashboard/widgets/multi_sensor_gauges_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/simulation_controls_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/live_alerts_feed_card.dart';
+import 'package:fireshield_app/presentation/features/dashboard/widgets/home_verification_dialog.dart';
+import 'package:fireshield_app/core/services/emergency_dispatch_service.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -30,11 +32,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await ref.read(deviceRepositoryProvider).simulateScenario(scenario, deviceId: 'dev_001');
 
     if (scenario == 'FIRE') {
+      final alertId = 'alt_${DateTime.now().millisecondsSinceEpoch}';
       ref.read(notificationRepositoryProvider).addLocalAlert(
         NotificationModel(
-          id: 'alt_${DateTime.now().millisecondsSinceEpoch}',
+          id: alertId,
           title: '🔥 CRITICAL FIRE ALERT: Kitchen',
-          message: 'Thermal anomaly & flame IR detected! Risk: 99.4% | Angle: 45° | Extinguisher: ACTIVE',
+          message: 'Abnormal heat (76.5°C) & flame IR detected! Risk: 99.4% | Angle: 45°',
           timestamp: DateTime.now(),
           isRead: false,
           severity: 'critical',
@@ -45,13 +48,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           fireAngle: 45,
         ),
       );
+
+      // Dispatch verification notification to User Messages & Mail
+      await EmergencyDispatchService().sendEmergencyVerificationNotice(
+        alertId: alertId,
+        roomId: 'Kitchen',
+        temperature: 76.5,
+        fireAngle: 45,
+        riskScore: 99.4,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Colors.red,
-            content: Text('🔥 Fire simulated in Kitchen! Aiming servo & triggering alerts.'),
+            content: Text('🔥 Fire & Abnormal Heat detected! Alerts sent to user Messages & Mail.'),
             duration: Duration(seconds: 3),
           ),
+        );
+
+        // Pop up the YES / NO Home Verification Dialog
+        HomeVerificationDialog.show(
+          context: context,
+          roomId: 'Kitchen',
+          temperature: 76.5,
+          fireAngle: 45,
+          riskScore: 99.4,
+          email: EmergencyDispatchService().userEmail,
+          phone: EmergencyDispatchService().userPhone,
+          onIssueCleared: () => _handleIssueCleared('Kitchen'),
+          onEmergencyConfirmed: () => _handleEmergencyConfirmed('Kitchen'),
         );
       }
     } else if (scenario == 'FALSE_ALARM') {
@@ -93,6 +119,51 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     ref.invalidate(devicesStreamProvider);
     ref.invalidate(notificationsStreamProvider);
+  }
+
+  Future<void> _handleIssueCleared(String room) async {
+    setState(() {
+      _currentScenario = 'NORMAL';
+    });
+
+    // 1. Reset telemetry to SAFE in repository
+    await ref.read(deviceRepositoryProvider).simulateScenario('NORMAL', deviceId: 'dev_001');
+
+    // 2. Acknowledge and clear all unread alerts
+    final alerts = ref.read(mockNotificationsProvider);
+    for (final a in alerts) {
+      if (!a.isRead) {
+        await ref.read(mockNotificationsProvider.notifier).acknowledge(a.id);
+      }
+    }
+
+    // 3. Dispatch All-Clear confirmation to Mail and Messages
+    await EmergencyDispatchService().sendAllClearConfirmation(roomId: room);
+
+    ref.invalidate(devicesStreamProvider);
+    ref.invalidate(notificationsStreamProvider);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.success,
+          content: Text('✅ Issue Cleared! Home verified safe by user. Safe mode restored.'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  void _handleEmergencyConfirmed(String room) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('🚨 Active Emergency Confirmed! Alarms active and emergency dispatch alerted.'),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   Future<void> _handleAngleNudge(int angle) async {
@@ -280,6 +351,126 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
+                      // Home Verification Card (Prompted on Abnormal Heat & Fire Detection)
+                      if (hasFireAlert) ...[
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.error, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.error.withValues(alpha: 0.25),
+                                blurRadius: 14,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.error.withValues(alpha: 0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.mark_email_read, color: Color(0xFF38BDF8), size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'HOME VERIFICATION REQUIRED',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Alerts dispatched to your Messages & Mail',
+                                          style: TextStyle(
+                                            color: Color(0xFF38BDF8),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.error,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'VERIFY',
+                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Abnormal temperature (${primaryDevice.ambientTemperature.toStringAsFixed(1)}°C) detected in ${primaryDevice.room}. Have you checked your home?',
+                                style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  // Button NO: Issue Cleared Out
+                                  Expanded(
+                                    flex: 6,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.success,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                                      label: const Text(
+                                        'NO, ISSUE CLEARED',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                      onPressed: () => _handleIssueCleared(primaryDevice.room),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Button YES: Active Fire
+                                  Expanded(
+                                    flex: 5,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.error,
+                                        side: const BorderSide(color: AppColors.error, width: 1.5),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.warning_amber, size: 18),
+                                      label: const Text(
+                                        'YES, ACTIVE FIRE',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                      onPressed: () => _handleEmergencyConfirmed(primaryDevice.room),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
                       // 2. Event Simulation Injector Bar
                       SimulationControlsCard(
