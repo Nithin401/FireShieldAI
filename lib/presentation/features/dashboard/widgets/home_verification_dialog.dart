@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fireshield_app/core/theme/app_colors.dart';
+import 'package:fireshield_app/core/services/emergency_dispatch_service.dart';
 
 class HomeVerificationDialog extends StatelessWidget {
   final String roomId;
@@ -130,23 +131,24 @@ class HomeVerificationDialog extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Notification Dispatch Confirmation
+          // Notification Dispatch Confirmation & Direct Launchers
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFF0B1120),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF334155)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.check_circle, color: AppColors.success, size: 14),
+                    const Icon(Icons.mark_email_read_outlined, color: AppColors.success, size: 14),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Alert Mail sent to: $email',
+                        'Alert Mail target: $email',
                         style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -156,13 +158,83 @@ class HomeVerificationDialog extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.check_circle, color: AppColors.success, size: 14),
+                    const Icon(Icons.sms_outlined, color: AppColors.success, size: 14),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Message / SMS sent to: $phone',
+                        'Alert Mobile target: $phone',
                         style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  '📱 Open alert directly on your connected device:',
+                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF25D366),
+                          side: const BorderSide(color: Color(0xFF25D366)),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                          minimumSize: Size.zero,
+                        ),
+                        icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                        label: const Text('WhatsApp', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          EmergencyDispatchService().openWhatsAppAlert(
+                            roomId: roomId,
+                            temperature: temperature,
+                            fireAngle: fireAngle,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF38BDF8),
+                          side: const BorderSide(color: Color(0xFF38BDF8)),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                          minimumSize: Size.zero,
+                        ),
+                        icon: const Icon(Icons.sms_outlined, size: 14),
+                        label: const Text('SMS / Msg', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          EmergencyDispatchService().openSmsAlert(
+                            roomId: roomId,
+                            temperature: temperature,
+                            fireAngle: fireAngle,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.amber,
+                          side: const BorderSide(color: Colors.amber),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                          minimumSize: Size.zero,
+                        ),
+                        icon: const Icon(Icons.email_outlined, size: 14),
+                        label: const Text('Mail App', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          EmergencyDispatchService().openMailAlert(
+                            roomId: roomId,
+                            temperature: temperature,
+                            fireAngle: fireAngle,
+                            riskScore: riskScore,
+                          );
+                        },
                       ),
                     ),
                   ],

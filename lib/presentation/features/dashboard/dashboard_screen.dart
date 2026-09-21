@@ -25,6 +25,159 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _currentScenario = 'NORMAL';
 
+  void _showContactSetupModal() {
+    final service = EmergencyDispatchService();
+    final emailController = TextEditingController(text: service.userEmail);
+    final phoneController = TextEditingController(text: service.userPhone);
+    bool autoDispatch = service.autoDispatchEnabled;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.phonelink_ring, color: Color(0xFF38BDF8), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Alert Recipient Settings',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Route real fire & abnormal heat alerts to your device',
+                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Your Mobile Number (SMS & WhatsApp)',
+                  hintText: 'e.g. +91 9876543210 or +1 2345678900',
+                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  prefixIcon: const Icon(Icons.phone_android, color: Colors.green),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Your Emergency Alert Email',
+                  hintText: 'e.g. yourname@gmail.com',
+                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF38BDF8)),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.save),
+                      label: const Text('Save Contacts', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        final email = emailController.text;
+                        final phone = phoneController.text;
+                        await service.updateContacts(
+                          email: email,
+                          phone: phone,
+                          autoDispatch: autoDispatch,
+                        );
+                        if (!mounted) return;
+                        setState(() {});
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              backgroundColor: AppColors.success,
+                              content: Text('✅ Alert contacts saved! Real alerts will route to your phone & mail.'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF38BDF8),
+                      side: const BorderSide(color: Color(0xFF38BDF8)),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.send_outlined, size: 16),
+                    label: const Text('Test SMS', style: TextStyle(fontSize: 12)),
+                    onPressed: () {
+                      service.openSmsAlert(
+                        roomId: 'Kitchen',
+                        temperature: 76.5,
+                        fireAngle: 45,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleSimulation(String scenario) async {
     setState(() {
       _currentScenario = scenario;
@@ -210,6 +363,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.contact_phone_outlined),
+            tooltip: 'Configure Alert Contacts (Mobile & Mail)',
+            onPressed: _showContactSetupModal,
+          ),
+          IconButton(
             icon: const Icon(Icons.phonelink_ring_outlined),
             tooltip: 'Test Device Notification',
             onPressed: () {
@@ -309,7 +467,76 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. AI Threat Status Banner
+                      // 1. Alert Routing & Connected Contacts Bar
+                      InkWell(
+                        onTap: _showContactSetupModal,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: EmergencyDispatchService().isCustomContactConfigured
+                                  ? const Color(0xFF334155)
+                                  : Colors.amber.withValues(alpha: 0.8),
+                              width: EmergencyDispatchService().isCustomContactConfigured ? 1 : 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.phonelink_ring_outlined,
+                                color: EmergencyDispatchService().isCustomContactConfigured
+                                    ? const Color(0xFF38BDF8)
+                                    : Colors.amber,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      EmergencyDispatchService().isCustomContactConfigured
+                                          ? 'Alerts routed to: ${EmergencyDispatchService().userPhone} | ${EmergencyDispatchService().userEmail}'
+                                          : '⚠️ Configure Mobile & Mail for real fire alerts ↗',
+                                      style: TextStyle(
+                                        color: EmergencyDispatchService().isCustomContactConfigured
+                                            ? const Color(0xFFCBD5E1)
+                                            : Colors.amber,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const Text(
+                                      'Sends real SMS, WhatsApp, & Mail with YES/NO home check',
+                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF334155),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Setup',
+                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // 1.1 AI Threat Status Banner
                       InkWell(
                         onTap: () => context.push('/notifications'),
                         borderRadius: BorderRadius.circular(16),
@@ -445,7 +672,73 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 'Abnormal temperature (${primaryDevice.ambientTemperature.toStringAsFixed(1)}°C) detected in ${primaryDevice.room}. Have you checked your home?',
                                 style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 10),
+                              // 1-Tap Quick Action Row
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF25D366),
+                                        side: const BorderSide(color: Color(0xFF25D366)),
+                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                                      label: const Text('WhatsApp', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      onPressed: () {
+                                        EmergencyDispatchService().openWhatsAppAlert(
+                                          roomId: primaryDevice.room,
+                                          temperature: primaryDevice.ambientTemperature,
+                                          fireAngle: primaryDevice.fireAngle,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF38BDF8),
+                                        side: const BorderSide(color: Color(0xFF38BDF8)),
+                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      icon: const Icon(Icons.sms_outlined, size: 14),
+                                      label: const Text('SMS Msg', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      onPressed: () {
+                                        EmergencyDispatchService().openSmsAlert(
+                                          roomId: primaryDevice.room,
+                                          temperature: primaryDevice.ambientTemperature,
+                                          fireAngle: primaryDevice.fireAngle,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.amber,
+                                        side: const BorderSide(color: Colors.amber),
+                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      icon: const Icon(Icons.email_outlined, size: 14),
+                                      label: const Text('Mail App', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      onPressed: () {
+                                        EmergencyDispatchService().openMailAlert(
+                                          roomId: primaryDevice.room,
+                                          temperature: primaryDevice.ambientTemperature,
+                                          fireAngle: primaryDevice.fireAngle,
+                                          riskScore: primaryDevice.riskScore,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
                               Row(
                                 children: [
                                   // Button NO: Issue Cleared Out

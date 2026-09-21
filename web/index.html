@@ -38,6 +38,17 @@
   <!-- FireShield App Native Audio & Notification Engine -->
   <script>
     window.FireShieldNotifications = {
+      openUrl: function(url) {
+        try {
+          if (url.startsWith('mailto:') || url.startsWith('sms:')) {
+            window.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
+        } catch (e) {
+          console.log("Open URL error:", e);
+        }
+      },
       requestPermission: function() {
         if ("Notification" in window) {
           return Notification.requestPermission();
