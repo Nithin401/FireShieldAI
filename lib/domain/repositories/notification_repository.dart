@@ -9,4 +9,7 @@ abstract class NotificationRepository {
 
   /// Mark all notifications as acknowledged/read
   Future<void> markAllAsRead();
+
+  /// Add a local notification (e.g. from in-app simulation or offline edge events)
+  void addLocalAlert(NotificationModel notif);
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fireshield_app/core/theme/app_colors.dart';
+import 'package:fireshield_app/domain/models/notification_model.dart';
 import 'package:fireshield_app/presentation/providers/repository_providers.dart';
 import 'package:fireshield_app/presentation/features/notifications/providers/notification_providers.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/sensor_card.dart';
@@ -19,6 +20,62 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('FireShield AI Dashboard'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.local_fire_department_outlined),
+            tooltip: 'Simulate Fire / Normal',
+            onPressed: () async {
+              final devices = devicesAsync.value ?? [];
+              final kitchen = devices.firstWhere(
+                (d) => d.id == 'dev_001',
+                orElse: () => devices.isNotEmpty ? devices.first : devices.first,
+              );
+              final isFire = kitchen.fireState == 'FIRE';
+
+              await ref.read(deviceRepositoryProvider).toggleSimulatedFire('dev_001');
+
+              if (!isFire) {
+                ref.read(notificationRepositoryProvider).addLocalAlert(
+                  NotificationModel(
+                    id: 'alt_${DateTime.now().millisecondsSinceEpoch}',
+                    title: '🔥 CRITICAL FIRE ALERT: Kitchen',
+                    message: 'Thermal abnormality detected! Risk: 98.5% | Angle: 45° | Actuator: ACTIVE',
+                    timestamp: DateTime.now(),
+                    isRead: false,
+                    severity: 'critical',
+                    deviceId: 'dev_001',
+                    roomId: 'Kitchen',
+                    fireState: 'FIRE',
+                    riskScore: 98.5,
+                    fireAngle: 45,
+                  ),
+                );
+                ref.invalidate(devicesStreamProvider);
+                ref.invalidate(notificationsStreamProvider);
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Colors.red,
+                      content: Text('🔥 Fire simulated in Kitchen! Tap banner to inspect.'),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } else {
+                ref.invalidate(devicesStreamProvider);
+                ref.invalidate(notificationsStreamProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Colors.green,
+                      content: Text('✅ Fire simulation cleared. System returned to SAFE mode.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () {

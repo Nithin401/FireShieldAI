@@ -89,4 +89,22 @@ class MockDeviceRepository implements DeviceRepository {
     _mockDatabase.removeWhere((d) => d.id == deviceId);
     _deviceController.add(List.from(_mockDatabase));
   }
+
+  @override
+  Future<void> toggleSimulatedFire(String deviceId) async {
+    final index = _mockDatabase.indexWhere((d) => d.id == deviceId);
+    if (index != -1) {
+      final current = _mockDatabase[index];
+      final isCurrentlyFire = current.fireState == 'FIRE';
+      _mockDatabase[index] = current.copyWith(
+        fireState: isCurrentlyFire ? 'SAFE' : 'FIRE',
+        riskScore: isCurrentlyFire ? 10.0 : 98.5,
+        flameRaw: isCurrentlyFire ? 820 : 140,
+        ambientTemperature: isCurrentlyFire ? 24.5 : 68.5,
+        fireAngle: isCurrentlyFire ? 90 : 45,
+        responseStatus: isCurrentlyFire ? 'IDLE' : 'ACTIVE',
+      );
+      _deviceController.add(List.from(_mockDatabase));
+    }
+  }
 }

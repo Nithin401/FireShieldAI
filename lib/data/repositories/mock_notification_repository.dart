@@ -65,4 +65,9 @@ class MockNotificationRepository implements NotificationRepository {
       _mockData[i] = _mockData[i].copyWith(isRead: true);
     }
   }
+
+  @override
+  void addLocalAlert(NotificationModel notif) {
+    _mockData.insert(0, notif);
+  }
 }
