@@ -6,4 +6,5 @@ abstract class DeviceRepository {
   Future<void> updateDevice(DeviceModel device);
   Future<void> deleteDevice(String deviceId);
   Future<void> toggleSimulatedFire(String deviceId);
+  Future<void> simulateScenario(String scenario, {String? deviceId});
 }

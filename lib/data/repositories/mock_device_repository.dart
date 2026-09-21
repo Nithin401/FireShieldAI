@@ -101,9 +101,56 @@ class MockDeviceRepository implements DeviceRepository {
         riskScore: isCurrentlyFire ? 10.0 : 98.5,
         flameRaw: isCurrentlyFire ? 820 : 140,
         ambientTemperature: isCurrentlyFire ? 24.5 : 68.5,
+        smokeRaw: isCurrentlyFire ? 110 : 850,
+        gasRaw: isCurrentlyFire ? 120 : 620,
         fireAngle: isCurrentlyFire ? 90 : 45,
         responseStatus: isCurrentlyFire ? 'IDLE' : 'ACTIVE',
       );
+      _deviceController.add(List.from(_mockDatabase));
+    }
+  }
+
+  @override
+  Future<void> simulateScenario(String scenario, {String? deviceId}) async {
+    final targetId = deviceId ?? 'dev_001';
+    final index = _mockDatabase.indexWhere((d) => d.id == targetId);
+    if (index != -1) {
+      final current = _mockDatabase[index];
+      if (scenario == 'FIRE') {
+        _mockDatabase[index] = current.copyWith(
+          fireState: 'FIRE',
+          riskScore: 99.2,
+          flameRaw: 95,
+          ambientTemperature: 76.5,
+          smokeRaw: 890,
+          gasRaw: 640,
+          fireAngle: 45,
+          responseStatus: 'ACTIVE',
+        );
+      } else if (scenario == 'FALSE_ALARM') {
+        _mockDatabase[index] = current.copyWith(
+          fireState: 'WARNING',
+          riskScore: 35.0,
+          flameRaw: 810,
+          ambientTemperature: 31.5,
+          smokeRaw: 340,
+          gasRaw: 450,
+          fireAngle: 90,
+          responseStatus: 'IDLE',
+        );
+      } else {
+        // NORMAL
+        _mockDatabase[index] = current.copyWith(
+          fireState: 'SAFE',
+          riskScore: 5.5,
+          flameRaw: 860,
+          ambientTemperature: 24.5,
+          smokeRaw: 110,
+          gasRaw: 120,
+          fireAngle: 90,
+          responseStatus: 'IDLE',
+        );
+      }
       _deviceController.add(List.from(_mockDatabase));
     }
   }

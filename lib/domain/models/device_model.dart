@@ -19,6 +19,8 @@ class DeviceModel {
 
   // Real-Time Fire & Angle Telemetry
   final int flameRaw;
+  final int gasRaw;
+  final int smokeRaw;
   final int fireAngle;
   final double riskScore;
   final String fireState;      // SAFE, WARNING, HIGH_RISK, FIRE
@@ -41,6 +43,8 @@ class DeviceModel {
     this.preciseTemperature = 25.0,
     this.hasThermalAbnormality = false,
     this.flameRaw = 850,
+    this.gasRaw = 120,
+    this.smokeRaw = 110,
     this.fireAngle = 90,
     this.riskScore = 0.0,
     this.fireState = 'SAFE',
@@ -67,6 +71,8 @@ class DeviceModel {
       preciseTemperature: (json['preciseTemperature'] as num?)?.toDouble() ?? 25.0,
       hasThermalAbnormality: json['hasThermalAbnormality'] as bool? ?? false,
       flameRaw: (json['flameRaw'] as num?)?.toInt() ?? 850,
+      gasRaw: (json['gasRaw'] as num?)?.toInt() ?? (json['gas'] as num?)?.toInt() ?? 120,
+      smokeRaw: (json['smokeRaw'] as num?)?.toInt() ?? (json['smoke'] as num?)?.toInt() ?? 110,
       fireAngle: (json['fireAngle'] as num?)?.toInt() ?? 90,
       riskScore: (json['riskScore'] as num?)?.toDouble() ?? 0.0,
       fireState: json['fireState'] as String? ?? 'SAFE',
@@ -92,6 +98,8 @@ class DeviceModel {
       'preciseTemperature': preciseTemperature,
       'hasThermalAbnormality': hasThermalAbnormality,
       'flameRaw': flameRaw,
+      'gasRaw': gasRaw,
+      'smokeRaw': smokeRaw,
       'fireAngle': fireAngle,
       'riskScore': riskScore,
       'fireState': fireState,
@@ -116,6 +124,8 @@ class DeviceModel {
     double? preciseTemperature,
     bool? hasThermalAbnormality,
     int? flameRaw,
+    int? gasRaw,
+    int? smokeRaw,
     int? fireAngle,
     double? riskScore,
     String? fireState,
@@ -138,6 +148,8 @@ class DeviceModel {
       preciseTemperature: preciseTemperature ?? this.preciseTemperature,
       hasThermalAbnormality: hasThermalAbnormality ?? this.hasThermalAbnormality,
       flameRaw: flameRaw ?? this.flameRaw,
+      gasRaw: gasRaw ?? this.gasRaw,
+      smokeRaw: smokeRaw ?? this.smokeRaw,
       fireAngle: fireAngle ?? this.fireAngle,
       riskScore: riskScore ?? this.riskScore,
       fireState: fireState ?? this.fireState,

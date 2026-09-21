@@ -142,6 +142,8 @@ class FirestoreDeviceRepository implements DeviceRepository {
         riskScore: isCurrentlyFire ? 10.0 : 98.5,
         flameRaw: isCurrentlyFire ? 850 : 140,
         ambientTemperature: isCurrentlyFire ? 24.8 : 68.5,
+        smokeRaw: isCurrentlyFire ? 110 : 880,
+        gasRaw: isCurrentlyFire ? 120 : 640,
         fireAngle: isCurrentlyFire ? 90 : 45,
         responseStatus: isCurrentlyFire ? 'IDLE' : 'ACTIVE',
         lastSync: DateTime.now(),
@@ -158,6 +160,77 @@ class FirestoreDeviceRepository implements DeviceRepository {
             'room_id': updated.room,
             'flame_raw': updated.flameRaw,
             'temp_c': updated.ambientTemperature,
+            'smoke_raw': updated.smokeRaw,
+            'gas_raw': updated.gasRaw,
+            'fire_angle': updated.fireAngle,
+            'is_fire': updated.fireState == 'FIRE',
+          },
+          options: Options(sendTimeout: const Duration(seconds: 1)),
+        );
+      } catch (_) {}
+    }
+  }
+
+  @override
+  Future<void> simulateScenario(String scenario, {String? deviceId}) async {
+    final targetId = deviceId ?? 'dev_001';
+    final index = _currentDevices.indexWhere((d) => d.id == targetId);
+    if (index != -1) {
+      final current = _currentDevices[index];
+      late final DeviceModel updated;
+
+      if (scenario == 'FIRE') {
+        updated = current.copyWith(
+          fireState: 'FIRE',
+          riskScore: 99.4,
+          flameRaw: 95,
+          ambientTemperature: 76.5,
+          smokeRaw: 890,
+          gasRaw: 640,
+          fireAngle: 45,
+          responseStatus: 'ACTIVE',
+          lastSync: DateTime.now(),
+        );
+      } else if (scenario == 'FALSE_ALARM') {
+        updated = current.copyWith(
+          fireState: 'WARNING',
+          riskScore: 36.0,
+          flameRaw: 810,
+          ambientTemperature: 31.5,
+          smokeRaw: 380,
+          gasRaw: 460,
+          fireAngle: 90,
+          responseStatus: 'IDLE',
+          lastSync: DateTime.now(),
+        );
+      } else {
+        // NORMAL
+        updated = current.copyWith(
+          fireState: 'SAFE',
+          riskScore: 6.0,
+          flameRaw: 860,
+          ambientTemperature: 24.5,
+          smokeRaw: 110,
+          gasRaw: 120,
+          fireAngle: 90,
+          responseStatus: 'IDLE',
+          lastSync: DateTime.now(),
+        );
+      }
+
+      _currentDevices[index] = updated;
+
+      // Try syncing with backend
+      try {
+        await _dio.post(
+          'http://localhost:5000/api/telemetry',
+          data: {
+            'device_id': updated.id,
+            'room_id': updated.room,
+            'flame_raw': updated.flameRaw,
+            'temp_c': updated.ambientTemperature,
+            'smoke_raw': updated.smokeRaw,
+            'gas_raw': updated.gasRaw,
             'fire_angle': updated.fireAngle,
             'is_fire': updated.fireState == 'FIRE',
           },
