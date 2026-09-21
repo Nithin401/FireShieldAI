@@ -110,6 +110,33 @@ class EmergencyDispatchService {
     openExternalUrl(url);
   }
 
+  /// Triggers an interactive AI Voice Emergency Call that speaks out loud on the user's device
+  void triggerAiEmergencyCall({
+    required String roomId,
+    required double temperature,
+    required int fireAngle,
+    required double riskScore,
+  }) {
+    final speechText =
+        'Emergency Alert! This is FireShield AI. Critical abnormal heat of ${temperature.toStringAsFixed(1)} degrees Celsius '
+        'and fire signature detected in $roomId at angle $fireAngle degrees! '
+        'AI risk score is ${riskScore.toStringAsFixed(0)} percent. '
+        'Immediate home safety verification is required! '
+        'Please inspect your home. Select NO if the issue is cleared out, or YES to confirm an active emergency!';
+    makeAiEmergencyVoiceCall(speechText);
+  }
+
+  void stopAiEmergencyCall() {
+    stopAiVoiceCall();
+  }
+
+  /// Directly dials the user's configured SOS phone number
+  void dialSosEmergencyCall() {
+    final cleanPhone = _sanitizePhoneForSms(userPhone);
+    final url = cleanPhone.isNotEmpty ? 'tel:$cleanPhone' : 'tel:911';
+    openExternalUrl(url);
+  }
+
   /// Sends emergency verification notifications through the app to the user's Messages and Mail
   Future<Map<String, dynamic>> sendEmergencyVerificationNotice({
     required String alertId,

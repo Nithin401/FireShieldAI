@@ -9,3 +9,11 @@ void requestNotificationPermission() {
 void openExternalUrl(String url) {
   // Stub for non-web platforms
 }
+
+void makeAiEmergencyVoiceCall(String text) {
+  // Stub for non-web platforms
+}
+
+void stopAiVoiceCall() {
+  // Stub for non-web platforms
+}

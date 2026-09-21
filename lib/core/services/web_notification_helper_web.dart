@@ -9,6 +9,12 @@ external void _jsRequestPermission();
 @JS('FireShieldNotifications.openUrl')
 external void _jsOpenUrl(JSString url);
 
+@JS('FireShieldNotifications.makeAiEmergencyVoiceCall')
+external void _jsMakeAiEmergencyVoiceCall(JSString text);
+
+@JS('FireShieldNotifications.stopAiVoiceCall')
+external void _jsStopAiVoiceCall();
+
 void triggerSystemNotification(String title, String body, String severity) {
   try {
     _jsShowNotification(title.toJS, body.toJS, severity.toJS);
@@ -24,5 +30,17 @@ void requestNotificationPermission() {
 void openExternalUrl(String url) {
   try {
     _jsOpenUrl(url.toJS);
+  } catch (_) {}
+}
+
+void makeAiEmergencyVoiceCall(String text) {
+  try {
+    _jsMakeAiEmergencyVoiceCall(text.toJS);
+  } catch (_) {}
+}
+
+void stopAiVoiceCall() {
+  try {
+    _jsStopAiVoiceCall();
   } catch (_) {}
 }

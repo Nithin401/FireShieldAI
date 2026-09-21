@@ -11,7 +11,7 @@ import 'package:fireshield_app/presentation/features/dashboard/widgets/direction
 import 'package:fireshield_app/presentation/features/dashboard/widgets/multi_sensor_gauges_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/simulation_controls_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/live_alerts_feed_card.dart';
-import 'package:fireshield_app/presentation/features/dashboard/widgets/home_verification_dialog.dart';
+import 'package:fireshield_app/presentation/features/dashboard/widgets/ai_emergency_call_dialog.dart';
 import 'package:fireshield_app/core/services/emergency_dispatch_service.dart';
 import 'package:fireshield_app/core/services/web_notification_helper.dart';
 
@@ -214,15 +214,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             backgroundColor: Colors.red,
-            content: Text('🔥 Fire & Abnormal Heat detected! Alerts sent to user Messages & Mail.'),
-            duration: Duration(seconds: 3),
+            content: Text('🔥 Fire Anomaly detected! AI Emergency Voice Call active for ${EmergencyDispatchService().userPhone}...'),
+            duration: const Duration(seconds: 4),
           ),
         );
 
-        // Pop up the YES / NO Home Verification Dialog
-        HomeVerificationDialog.show(
+        // Automatically launch the interactive AI Emergency Call HUD
+        AiEmergencyCallDialog.show(
           context: context,
           roomId: 'Kitchen',
           temperature: 76.5,
@@ -280,6 +280,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       _currentScenario = 'NORMAL';
     });
 
+    // Stop ongoing speech and speak All-Clear confirmation
+    EmergencyDispatchService().stopAiEmergencyCall();
+    makeAiEmergencyVoiceCall('Home verified safe by user. Alarms disarmed, normal room temperature restored.');
+
     // 1. Reset telemetry to SAFE in repository
     await ref.read(deviceRepositoryProvider).simulateScenario('NORMAL', deviceId: 'dev_001');
 
@@ -309,11 +313,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   void _handleEmergencyConfirmed(String room) {
+    EmergencyDispatchService().stopAiEmergencyCall();
+    EmergencyDispatchService().dialSosEmergencyCall();
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: AppColors.error,
-          content: Text('🚨 Active Emergency Confirmed! Alarms active and emergency dispatch alerted.'),
+          content: Text('🚨 Active Emergency Confirmed! Dialing SOS Emergency Dispatch and sounding siren.'),
           duration: Duration(seconds: 5),
         ),
       );
@@ -732,6 +739,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           temperature: primaryDevice.ambientTemperature,
                                           fireAngle: primaryDevice.fireAngle,
                                           riskScore: primaryDevice.riskScore,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFDC2626),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      icon: const Icon(Icons.record_voice_over, size: 14),
+                                      label: const Text('AI Call', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      onPressed: () {
+                                        AiEmergencyCallDialog.show(
+                                          context: context,
+                                          roomId: primaryDevice.room,
+                                          temperature: primaryDevice.ambientTemperature,
+                                          fireAngle: primaryDevice.fireAngle,
+                                          riskScore: primaryDevice.riskScore,
+                                          email: EmergencyDispatchService().userEmail,
+                                          phone: EmergencyDispatchService().userPhone,
+                                          onIssueCleared: () => _handleIssueCleared(primaryDevice.room),
+                                          onEmergencyConfirmed: () => _handleEmergencyConfirmed(primaryDevice.room),
                                         );
                                       },
                                     ),

@@ -40,7 +40,7 @@
     window.FireShieldNotifications = {
       openUrl: function(url) {
         try {
-          if (url.startsWith('mailto:') || url.startsWith('sms:')) {
+          if (url.startsWith('mailto:') || url.startsWith('sms:') || url.startsWith('tel:')) {
             window.location.href = url;
           } else {
             window.open(url, '_blank');
@@ -48,6 +48,28 @@
         } catch (e) {
           console.log("Open URL error:", e);
         }
+      },
+      makeAiEmergencyVoiceCall: function(speechText) {
+        try {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            var utterance = new SpeechSynthesisUtterance(speechText);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.05;
+            utterance.volume = 1.0;
+            utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+          }
+        } catch (e) {
+          console.log("AI voice call error:", e);
+        }
+      },
+      stopAiVoiceCall: function() {
+        try {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+          }
+        } catch (e) {}
       },
       requestPermission: function() {
         if ("Notification" in window) {
