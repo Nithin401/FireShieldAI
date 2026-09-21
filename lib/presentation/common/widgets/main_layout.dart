@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fireshield_app/core/services/push_notification_service.dart';
+import 'package:fireshield_app/presentation/features/notifications/providers/notification_providers.dart';
+import 'package:fireshield_app/core/theme/app_colors.dart';
 
-class MainLayout extends StatelessWidget {
+class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainLayout({
@@ -10,34 +14,71 @@ class MainLayout extends StatelessWidget {
   });
 
   @override
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends ConsumerState<MainLayout> {
+  @override
+  void initState() {
+    super.initState();
+    PushNotificationService().initialize();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Listen for real-time alerts across all app screens
+    ref.listen(mockNotificationsProvider, (previous, next) {
+      final unreadCriticals = next.where((n) => !n.isRead && (n.severity == 'critical' || n.severity == 'warning')).toList();
+      for (final alert in unreadCriticals) {
+        PushNotificationService().dispatchAppNotification(
+          id: alert.id,
+          title: alert.title,
+          message: alert.message,
+          severity: alert.severity,
+          context: context,
+          onAcknowledge: () {
+            ref.read(mockNotificationsProvider.notifier).acknowledge(alert.id);
+          },
+        );
+      }
+    });
+
+    final notifications = ref.watch(mockNotificationsProvider);
+    final unreadCount = notifications.where((n) => !n.isRead && n.severity == 'critical').length;
+
     return Scaffold(
-      body: child,
+      body: widget.child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _calculateSelectedIndex(context),
         onDestinationSelected: (int index) => _onItemTapped(index, context),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
+            icon: unreadCount > 0
+                ? Badge.count(
+                    count: unreadCount,
+                    backgroundColor: AppColors.error,
+                    child: const Icon(Icons.dashboard_outlined),
+                  )
+                : const Icon(Icons.dashboard_outlined),
+            selectedIcon: const Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.devices_other_outlined),
             selectedIcon: Icon(Icons.devices_other),
             label: 'Devices',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.map_outlined),
             selectedIcon: Icon(Icons.map),
             label: 'Map',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: 'Reports',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
