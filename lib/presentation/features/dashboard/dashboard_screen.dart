@@ -13,6 +13,7 @@ import 'package:fireshield_app/presentation/features/dashboard/widgets/simulatio
 import 'package:fireshield_app/presentation/features/dashboard/widgets/live_alerts_feed_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/home_verification_dialog.dart';
 import 'package:fireshield_app/core/services/emergency_dispatch_service.dart';
+import 'package:fireshield_app/core/services/web_notification_helper.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -208,6 +209,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.phonelink_ring_outlined),
+            tooltip: 'Test Device Notification',
+            onPressed: () {
+              requestNotificationPermission();
+              triggerSystemNotification(
+                '🔔 FireShield AI Device Test',
+                'Your device is connected and ready to receive real-time emergency fire alerts!',
+                'critical',
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  backgroundColor: Colors.blue,
+                  content: Text('🔔 Sent test alert to this device! Tap "Allow" if your browser prompts.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Sync Telemetry',
