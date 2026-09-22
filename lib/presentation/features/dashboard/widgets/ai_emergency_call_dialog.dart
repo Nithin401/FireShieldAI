@@ -36,10 +36,13 @@ class AiEmergencyCallDialog extends StatefulWidget {
     required VoidCallback onIssueCleared,
     required VoidCallback onEmergencyConfirmed,
   }) {
-    return showDialog(
+    return showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AiEmergencyCallDialog(
+      barrierColor: const Color(0xFA030712), // 98% opaque dark slate - completely prevents background merging
+      barrierLabel: 'AI Emergency Call',
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (ctx, anim1, anim2) => AiEmergencyCallDialog(
         roomId: roomId,
         temperature: temperature,
         fireAngle: fireAngle,
@@ -55,6 +58,12 @@ class AiEmergencyCallDialog extends StatefulWidget {
           onEmergencyConfirmed();
         },
       ),
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: child,
+        );
+      },
     );
   }
 
@@ -73,7 +82,7 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1100),
     )..repeat(reverse: true);
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -84,7 +93,7 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
       }
     });
 
-    // Start AI Emergency Speech Narration
+    // Speak AI voice emergency broadcast
     EmergencyDispatchService().triggerAiEmergencyCall(
       roomId: widget.roomId,
       temperature: widget.temperature,
@@ -109,302 +118,444 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: const Color(0xFF0F172A),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: const BorderSide(color: AppColors.error, width: 2.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 1. Active Call Header Bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FadeTransition(
-                    opacity: _pulseController,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'AI EMERGENCY VOICE CALL',
-                    style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatDuration(_seconds),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
+    final mediaQuery = MediaQuery.of(context);
+    final isMobile = mediaQuery.size.width < 640;
 
-            // 2. Caller Avatar with Pulsing Waves
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
+    final contentWidget = _buildCallContent(context, isMobile: isMobile);
+
+    if (isMobile) {
+      // Mobile: Full-screen dedicated call HUD with zero backdrop bleed-through
+      return Scaffold(
+        backgroundColor: const Color(0xFF090D16),
+        body: SafeArea(
+          child: contentWidget,
+        ),
+      );
+    } else {
+      // Desktop / Tablet: Centered modal card with clean solid backdrop
+      return Dialog(
+        backgroundColor: const Color(0xFF0F172A),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppColors.error, width: 2),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: contentWidget,
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildCallContent(BuildContext context, {required bool isMobile}) {
+    return Column(
+      children: [
+        // 1. Top Call Status Header
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 0,
+            vertical: isMobile ? 12 : 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 80 + (_pulseController.value * 16),
-                      height: 80 + (_pulseController.value * 16),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.error.withValues(alpha: 0.25 * (1 - _pulseController.value)),
+                    FadeTransition(
+                      opacity: _pulseController,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                    Container(
-                      width: 74,
-                      height: 74,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF1E293B),
-                        border: Border.all(color: AppColors.error, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.error.withValues(alpha: 0.4),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                          ),
-                        ],
+                    const SizedBox(width: 8),
+                    const Text(
+                      'AI EMERGENCY VOICE CALL',
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.1,
                       ),
-                      child: const Icon(
-                        Icons.record_voice_over,
-                        color: Colors.white,
-                        size: 34,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDuration(_seconds),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
-                );
-              },
-            ),
-            const SizedBox(height: 12),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_fullscreen_rounded, color: Colors.white60, size: 20),
+                tooltip: 'Minimize Call to Dashboard',
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        ),
 
-            // 3. Caller Identity
-            const Text(
-              'FireShield AI Safety Central',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Connected SOS Device: ${widget.phone}',
-              style: const TextStyle(
-                color: Color(0xFF38BDF8),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 14),
+        const Divider(color: Color(0xFF1E293B), height: 16),
 
-            // 4. Live Speech / Telemetry Dispatch Box
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.volume_up, color: Color(0xFF38BDF8), size: 16),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'AI Voice Telemetry Dispatch:',
-                        style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+        // 2. Scrollable Body
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 18 : 4,
+              vertical: 8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 10),
+
+                // 2.1 Caller Avatar with Pulsing Waves
+                AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 84 + (_pulseController.value * 22),
+                          height: 84 + (_pulseController.value * 22),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.error.withValues(alpha: 0.22 * (1 - _pulseController.value)),
+                          ),
                         ),
+                        Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF1E293B),
+                            border: Border.all(color: AppColors.error, width: 2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.error.withValues(alpha: 0.4),
+                                blurRadius: 18,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.record_voice_over,
+                            color: Colors.white,
+                            size: 34,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // 2.2 Caller Details
+                const Text(
+                  'FireShield AI Safety Central',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Target: ${widget.phone} | ${widget.email}',
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 14),
+
+                // 2.3 Critical Telemetry Highlight Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141E33),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildMetricBadge('Zone', widget.roomId, Colors.white),
+                      _buildDivider(),
+                      _buildMetricBadge('Temp', '${widget.temperature.toStringAsFixed(1)}°C', AppColors.error),
+                      _buildDivider(),
+                      _buildMetricBadge('Bearing', '${widget.fireAngle}°', const Color(0xFF38BDF8)),
+                      _buildDivider(),
+                      _buildMetricBadge('Risk', '${widget.riskScore.toStringAsFixed(0)}%', AppColors.error),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // 2.4 Live Speech Narration Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.volume_up, color: Color(0xFF38BDF8), size: 16),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'AI Audio Broadcast Transmission:',
+                            style: TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.replay, color: Colors.white70, size: 16),
+                            tooltip: 'Replay Speech',
+                            onPressed: () {
+                              EmergencyDispatchService().triggerAiEmergencyCall(
+                                roomId: widget.roomId,
+                                temperature: widget.temperature,
+                                fireAngle: widget.fireAngle,
+                                riskScore: widget.riskScore,
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      const Spacer(),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.replay, color: Colors.white70, size: 16),
-                        tooltip: 'Repeat Voice Alert',
-                        onPressed: () {
-                          EmergencyDispatchService().triggerAiEmergencyCall(
-                            roomId: widget.roomId,
-                            temperature: widget.temperature,
-                            fireAngle: widget.fireAngle,
-                            riskScore: widget.riskScore,
-                          );
-                        },
+                      const SizedBox(height: 6),
+                      Text(
+                        '⚠️ "Critical abnormal heat (${widget.temperature.toStringAsFixed(1)}°C) detected in ${widget.roomId} at threat angle ${widget.fireAngle}°. Home verification required. Select NO if issue is cleared, or YES for emergency."',
+                        style: const TextStyle(
+                          color: Color(0xFFF1F5F9),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          height: 1.35,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '⚠️ "Abnormal temperature (${widget.temperature.toStringAsFixed(1)}°C) detected in ${widget.roomId} at threat angle ${widget.fireAngle}°. AI risk is ${widget.riskScore.toStringAsFixed(0)}%.\nVerify home: NO (cleared) or YES (emergency)."',
-                    style: const TextStyle(
-                      color: Color(0xFFF1F5F9),
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
+                ),
+                const SizedBox(height: 14),
 
-            // 5. Multi-Channel Quick Action Row (SOS Call, WhatsApp, SMS)
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                // 2.5 Quick Contact Actions (Direct Dial, WhatsApp, SMS)
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.phone_in_talk, size: 15),
+                        label: const Text('Dial SOS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          EmergencyDispatchService().dialSosEmergencyCall();
+                        },
+                      ),
                     ),
-                    icon: const Icon(Icons.call, size: 16),
-                    label: const Text('Dial SOS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    onPressed: () {
-                      EmergencyDispatchService().dialSosEmergencyCall();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF25D366),
-                      side: const BorderSide(color: Color(0xFF25D366)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF25D366),
+                          side: const BorderSide(color: Color(0xFF25D366)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                        label: const Text('WhatsApp', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          EmergencyDispatchService().openWhatsAppAlert(
+                            roomId: widget.roomId,
+                            temperature: widget.temperature,
+                            fireAngle: widget.fireAngle,
+                          );
+                        },
+                      ),
                     ),
-                    icon: const Icon(Icons.chat, size: 15),
-                    label: const Text('WhatsApp', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    onPressed: () {
-                      EmergencyDispatchService().openWhatsAppAlert(
-                        roomId: widget.roomId,
-                        temperature: widget.temperature,
-                        fireAngle: widget.fireAngle,
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF38BDF8),
-                      side: const BorderSide(color: Color(0xFF38BDF8)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF38BDF8),
+                          side: const BorderSide(color: Color(0xFF38BDF8)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.sms_outlined, size: 14),
+                        label: const Text('SMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          EmergencyDispatchService().openSmsAlert(
+                            roomId: widget.roomId,
+                            temperature: widget.temperature,
+                            fireAngle: widget.fireAngle,
+                          );
+                        },
+                      ),
                     ),
-                    icon: const Icon(Icons.sms, size: 15),
-                    label: const Text('SMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    onPressed: () {
-                      EmergencyDispatchService().openSmsAlert(
-                        roomId: widget.roomId,
-                        temperature: widget.temperature,
-                        fireAngle: widget.fireAngle,
-                      );
-                    },
-                  ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // 6. Primary Home Verification Action Buttons (YES / NO)
-            const Text(
-              'Did you inspect the area? Verify home status:',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Choice 1: NO - Issue Cleared
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 4,
-                ),
-                icon: const Icon(Icons.check_circle_outline, size: 20),
-                label: const Text(
-                  'NO, ISSUE IS CLEARED (Checked & Safe)',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                onPressed: () {
-                  EmergencyDispatchService().stopAiEmergencyCall();
-                  widget.onIssueCleared();
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Choice 2: YES - Confirmed Fire Emergency
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.error, width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.warning_amber, size: 20),
-                label: const Text(
-                  'YES, ACTIVE FIRE (Sound SOS Alarm)',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                onPressed: () {
-                  EmergencyDispatchService().stopAiEmergencyCall();
-                  widget.onEmergencyConfirmed();
-                },
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+
+        // 3. Dedicated Verification Action Dock at Bottom (Clean, Distinct, Never Merging)
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 18 : 8,
+            vertical: 14,
+          ),
+          decoration: const BoxDecoration(
+            color: Color(0xFF0F172A),
+            border: Border(top: BorderSide(color: Color(0xFF1E293B))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Have you checked the room? Verify home status:',
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Button 1: NO - ISSUE CLEARED
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 3,
+                  ),
+                  icon: const Icon(Icons.check_circle_outline, size: 20),
+                  label: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'NO, ISSUE IS CLEARED',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Home checked & verified safe • Disarm alarm',
+                        style: TextStyle(fontSize: 10, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                  onPressed: () {
+                    EmergencyDispatchService().stopAiEmergencyCall();
+                    widget.onIssueCleared();
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Button 2: YES - ACTIVE FIRE
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error, width: 1.8),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.warning_amber, size: 20),
+                  label: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'YES, ACTIVE FIRE EMERGENCY',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Confirm fire • Escalate to Emergency Services',
+                        style: TextStyle(fontSize: 10, color: Colors.redAccent),
+                      ),
+                    ],
+                  ),
+                  onPressed: () {
+                    EmergencyDispatchService().stopAiEmergencyCall();
+                    widget.onEmergencyConfirmed();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricBadge(String label, String value, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      height: 22,
+      color: const Color(0xFF1E293B),
     );
   }
 }

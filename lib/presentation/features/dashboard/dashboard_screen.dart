@@ -606,21 +606,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Home Verification Card (Prompted on Abnormal Heat & Fire Detection)
+                      // 1.2 Active Emergency Banner (Compact & Non-Clashing with Call HUD)
                       if (hasFireAlert) ...[
                         Container(
                           width: double.infinity,
                           margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.error, width: 2),
+                            color: const Color(0xFF1E1524),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.error, width: 1.5),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.error.withValues(alpha: 0.25),
-                                blurRadius: 14,
-                                spreadRadius: 1,
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
@@ -630,183 +630,97 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
                                       color: AppColors.error.withValues(alpha: 0.2),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.mark_email_read, color: Color(0xFF38BDF8), size: 20),
+                                    child: const Icon(Icons.phonelink_ring, color: Colors.redAccent, size: 18),
                                   ),
                                   const SizedBox(width: 10),
-                                  const Expanded(
+                                  Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          'HOME VERIFICATION REQUIRED',
+                                        const Text(
+                                          'ACTIVE EMERGENCY: VERIFY HOME',
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontSize: 14,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                         Text(
-                                          'Alerts dispatched to your Messages & Mail',
-                                          style: TextStyle(
-                                            color: Color(0xFF38BDF8),
+                                          '${primaryDevice.room} • ${primaryDevice.ambientTemperature.toStringAsFixed(1)}°C • AI Call Active',
+                                          style: const TextStyle(
+                                            color: Color(0xFFF87171),
                                             fontSize: 11,
-                                            fontWeight: FontWeight.w600,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.error,
-                                      borderRadius: BorderRadius.circular(6),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
-                                    child: const Text(
-                                      'VERIFY',
-                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
+                                    icon: const Icon(Icons.record_voice_over, size: 14),
+                                    label: const Text('Open Call', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    onPressed: () {
+                                      AiEmergencyCallDialog.show(
+                                        context: context,
+                                        roomId: primaryDevice.room,
+                                        temperature: primaryDevice.ambientTemperature,
+                                        fireAngle: primaryDevice.fireAngle,
+                                        riskScore: primaryDevice.riskScore,
+                                        email: EmergencyDispatchService().userEmail,
+                                        phone: EmergencyDispatchService().userPhone,
+                                        onIssueCleared: () => _handleIssueCleared(primaryDevice.room),
+                                        onEmergencyConfirmed: () => _handleEmergencyConfirmed(primaryDevice.room),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              Text(
-                                'Abnormal temperature (${primaryDevice.ambientTemperature.toStringAsFixed(1)}°C) detected in ${primaryDevice.room}. Have you checked your home?',
-                                style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                              ),
-                              const SizedBox(height: 10),
-                              // 1-Tap Quick Action Row
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: const Color(0xFF25D366),
-                                        side: const BorderSide(color: Color(0xFF25D366)),
-                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                        minimumSize: Size.zero,
-                                      ),
-                                      icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                                      label: const Text('WhatsApp', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                      onPressed: () {
-                                        EmergencyDispatchService().openWhatsAppAlert(
-                                          roomId: primaryDevice.room,
-                                          temperature: primaryDevice.ambientTemperature,
-                                          fireAngle: primaryDevice.fireAngle,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: const Color(0xFF38BDF8),
-                                        side: const BorderSide(color: Color(0xFF38BDF8)),
-                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                        minimumSize: Size.zero,
-                                      ),
-                                      icon: const Icon(Icons.sms_outlined, size: 14),
-                                      label: const Text('SMS Msg', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                      onPressed: () {
-                                        EmergencyDispatchService().openSmsAlert(
-                                          roomId: primaryDevice.room,
-                                          temperature: primaryDevice.ambientTemperature,
-                                          fireAngle: primaryDevice.fireAngle,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.amber,
-                                        side: const BorderSide(color: Colors.amber),
-                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                        minimumSize: Size.zero,
-                                      ),
-                                      icon: const Icon(Icons.email_outlined, size: 14),
-                                      label: const Text('Mail App', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                      onPressed: () {
-                                        EmergencyDispatchService().openMailAlert(
-                                          roomId: primaryDevice.room,
-                                          temperature: primaryDevice.ambientTemperature,
-                                          fireAngle: primaryDevice.fireAngle,
-                                          riskScore: primaryDevice.riskScore,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFDC2626),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                        minimumSize: Size.zero,
-                                      ),
-                                      icon: const Icon(Icons.record_voice_over, size: 14),
-                                      label: const Text('AI Call', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                      onPressed: () {
-                                        AiEmergencyCallDialog.show(
-                                          context: context,
-                                          roomId: primaryDevice.room,
-                                          temperature: primaryDevice.ambientTemperature,
-                                          fireAngle: primaryDevice.fireAngle,
-                                          riskScore: primaryDevice.riskScore,
-                                          email: EmergencyDispatchService().userEmail,
-                                          phone: EmergencyDispatchService().userPhone,
-                                          onIssueCleared: () => _handleIssueCleared(primaryDevice.room),
-                                          onEmergencyConfirmed: () => _handleEmergencyConfirmed(primaryDevice.room),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  // Button NO: Issue Cleared Out
                                   Expanded(
                                     flex: 6,
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.success,
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
-                                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                                      icon: const Icon(Icons.check_circle_outline, size: 16),
                                       label: const Text(
                                         'NO, ISSUE CLEARED',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                       ),
                                       onPressed: () => _handleIssueCleared(primaryDevice.room),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Button YES: Active Fire
                                   Expanded(
                                     flex: 5,
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: AppColors.error,
-                                        side: const BorderSide(color: AppColors.error, width: 1.5),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        side: const BorderSide(color: AppColors.error),
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
-                                      icon: const Icon(Icons.warning_amber, size: 18),
+                                      icon: const Icon(Icons.warning_amber, size: 16),
                                       label: const Text(
                                         'YES, ACTIVE FIRE',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                       ),
                                       onPressed: () => _handleEmergencyConfirmed(primaryDevice.room),
                                     ),
