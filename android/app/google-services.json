@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1061002575810",
+    "firebase_url": "https://smart-fire-detection-272bb-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "smart-fire-detection-272bb",
+    "storage_bucket": "smart-fire-detection-272bb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061002575810:android:0545057f0b9575c39a605b",
+        "android_client_info": {
+          "package_name": "com.fireshield.fireshield_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGPqgXRlEnmBRLxxUz-lADNad6fvDNrVk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
