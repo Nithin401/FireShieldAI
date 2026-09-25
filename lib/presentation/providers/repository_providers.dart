@@ -14,10 +14,16 @@ import 'package:fireshield_app/domain/repositories/hardware_protocol_repository.
 import 'package:fireshield_app/domain/repositories/notification_repository.dart';
 import 'package:fireshield_app/domain/repositories/report_repository.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:fireshield_app/data/repositories/firebase_auth_repository.dart';
+
 // Set to true to stream real telemetry from Python Backend / Firestore; false for static mocks
 const bool useRealBackend = true;
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  if (Firebase.apps.isNotEmpty) {
+    return FirebaseAuthRepository();
+  }
   return MockAuthRepository();
 });
 

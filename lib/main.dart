@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -11,8 +13,15 @@ void main() async {
   // Initialize Emergency Contacts & Settings
   await EmergencyDispatchService().initialize();
   
-  // Initialize Firebase (mocked for now, until Milestone 11)
-  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Initialize Firebase for project smart-fire-detection-272bb
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('🔥 Firebase initialized for project: smart-fire-detection-272bb');
+  } catch (e) {
+    debugPrint('ℹ️ Firebase initialization note: $e');
+  }
   
   runApp(
     const ProviderScope(
