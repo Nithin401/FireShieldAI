@@ -14,8 +14,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(text: 'admin@fireshield.io');
-  final _passwordController = TextEditingController(text: 'Password123!');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -32,7 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both email and password.';
+        _errorMessage = 'Please enter your registered email and password.';
       });
       return;
     }
@@ -50,8 +50,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final errText = e.toString();
+        String message = 'Unable to sign in. Please verify your credentials.';
+        if (errText.contains('user-not-found') || errText.contains('invalid-credential')) {
+          message = 'No FireShield account found or invalid password. Please register below.';
+        } else if (errText.contains('wrong-password')) {
+          message = 'Incorrect password. Please try again or tap Forgot Password.';
+        } else if (errText.contains('invalid-email')) {
+          message = 'Please enter a valid email address.';
+        } else {
+          message = errText.replaceFirst(RegExp(r'^\[.*?\]\s*'), '');
+        }
         setState(() {
-          _errorMessage = e.toString().replaceFirst(RegExp(r'^\[.*?\]\s*'), '');
+          _errorMessage = message;
         });
       }
     } finally {

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:fireshield_app/domain/models/report_model.dart';
 import 'package:fireshield_app/domain/repositories/report_repository.dart';
+import 'package:fireshield_app/core/services/telemetry_ml_export_service.dart';
 
 class MockReportRepository implements ReportRepository {
   final _random = Random();
@@ -33,12 +34,11 @@ class MockReportRepository implements ReportRepository {
 
   @override
   Future<void> exportReportAsPdf(String period) async {
-    await Future.delayed(const Duration(seconds: 2));
-    // In a real app, this would trigger a cloud function to generate and download a PDF
+    await Future.delayed(const Duration(milliseconds: 600));
   }
 
   @override
   Future<void> exportReportAsCsv(String period) async {
-    await Future.delayed(const Duration(seconds: 1));
+    TelemetryMlExportService.exportTelemetryCsv(period: period);
   }
 }

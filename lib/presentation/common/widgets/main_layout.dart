@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fireshield_app/core/services/push_notification_service.dart';
+import 'package:fireshield_app/core/services/permission_onboarding_service.dart';
 import 'package:fireshield_app/presentation/features/notifications/providers/notification_providers.dart';
 import 'package:fireshield_app/core/theme/app_colors.dart';
 
@@ -22,6 +23,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   void initState() {
     super.initState();
     PushNotificationService().initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PermissionOnboardingService.checkAndPromptPermissions(context);
+    });
   }
 
   @override

@@ -176,7 +176,127 @@ class ReportsScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
+
+                      // Multi-Sensor ML Context & False Alarm Suppression Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF1E293B),
+                              const Color(0xFF0F172A).withValues(alpha: 0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.psychology, color: Color(0xFF38BDF8), size: 20),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Multi-Sensor ML Fusion & Sunny Baseline Filter',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Prevents false alarms from sunny weather baseline shifts',
+                                        style: TextStyle(
+                                          color: Color(0xFF94A3B8),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
+                                  ),
+                                  child: const Text(
+                                    'ACTIVE',
+                                    style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            const Divider(color: Color(0xFF334155), height: 1),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildMlMetric(
+                                    label: 'Sunny Day Filter',
+                                    value: 'Rate-of-Rise Check',
+                                    sub: 'Inhibits alarm if dT/dt < 0.5°C/s',
+                                    icon: Icons.wb_sunny_outlined,
+                                    color: const Color(0xFFF59E0B),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _buildMlMetric(
+                                    label: 'Optical IR Flicker',
+                                    value: 'Photodiode ADC',
+                                    sub: 'Rejects daylight IR artifacts',
+                                    icon: Icons.remove_red_eye_outlined,
+                                    color: const Color(0xFF38BDF8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildMlMetric(
+                                    label: 'Combustion Gas',
+                                    value: 'MQ-2 PPM Spike',
+                                    sub: 'Verifies smoke particulate',
+                                    icon: Icons.grain,
+                                    color: const Color(0xFFA855F7),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _buildMlMetric(
+                                    label: 'Targeted Bearing',
+                                    value: 'Servo Azimuth',
+                                    sub: 'Pinpoints 0°-180° threat origin',
+                                    icon: Icons.radar,
+                                    color: const Color(0xFFEF4444),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       Row(
                         children: [
                           Expanded(
@@ -271,6 +391,48 @@ class ReportsScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMlMetric({
+    required String label,
+    required String value,
+    required String sub,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            sub,
+            style: TextStyle(color: color.withValues(alpha: 0.9), fontSize: 10),
+          ),
+        ],
       ),
     );
   }

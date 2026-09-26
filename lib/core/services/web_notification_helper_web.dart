@@ -39,8 +39,17 @@ void makeAiEmergencyVoiceCall(String text) {
   } catch (_) {}
 }
 
+@JS('FireShieldNotifications.downloadCsv')
+external void _jsDownloadCsv(JSString filename, JSString content);
+
 void stopAiVoiceCall() {
   try {
     _jsStopAiVoiceCall();
+  } catch (_) {}
+}
+
+void downloadCsvFile(String filename, String content) {
+  try {
+    _jsDownloadCsv(filename.toJS, content.toJS);
   } catch (_) {}
 }

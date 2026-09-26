@@ -15,12 +15,34 @@ import '../../presentation/features/notifications/notifications_screen.dart';
 import '../../presentation/features/reports/reports_screen.dart';
 import '../../presentation/features/settings/settings_screen.dart';
 import '../../presentation/features/settings/profile_screen.dart';
+import '../../presentation/providers/repository_providers.dart';
 
-// We will use Riverpod to inject the router so we can add auth guards later.
+// Strict Auth-Guarded Router: Unauthenticated users CANNOT access protected routes
 final routerProvider = Provider<GoRouter>((ref) {
+  final authRepo = ref.watch(authRepositoryProvider);
+  final authState = ref.watch(authStateProvider);
+
   return GoRouter(
     initialLocation: '/login',
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: false,
+    redirect: (BuildContext context, GoRouterState state) {
+      final userId = authState.asData?.value ?? authRepo.currentUserId;
+      final bool isAuthenticated = userId != null && userId.isNotEmpty;
+      final path = state.uri.path;
+      final bool isAuthRoute = path == '/login' || path == '/signup' || path == '/forgot-password';
+
+      // If user is not authenticated and trying to view dashboard or app screens -> redirect to login
+      if (!isAuthenticated && !isAuthRoute) {
+        return '/login';
+      }
+
+      // If user is authenticated and navigating to login/signup -> forward to dashboard
+      if (isAuthenticated && isAuthRoute) {
+        return '/';
+      }
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/login',
