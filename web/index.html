@@ -49,23 +49,72 @@
           console.log("Open URL error:", e);
         }
       },
+      _sirenInterval: null,
+      _sirenAudioCtx: null,
+      _speechInterval: null,
       makeAiEmergencyVoiceCall: function(speechText) {
         try {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            var utterance = new SpeechSynthesisUtterance(speechText);
-            utterance.rate = 1.0;
-            utterance.pitch = 1.05;
-            utterance.volume = 1.0;
-            utterance.lang = 'en-US';
-            window.speechSynthesis.speak(utterance);
+          FireShieldNotifications.stopAiVoiceCall();
+
+          // 1. Play continuous emergency siren sound out of device speaker
+          var AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            var ctx = new AudioCtx();
+            FireShieldNotifications._sirenAudioCtx = ctx;
+            var playWarble = function() {
+              if (!FireShieldNotifications._sirenAudioCtx) return;
+              try {
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(960, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(770, ctx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.65);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.65);
+              } catch (_) {}
+            };
+            playWarble();
+            FireShieldNotifications._sirenInterval = setInterval(playWarble, 850);
           }
+
+          // 2. Play continuous loud AI speech broadcast repeatedly
+          var speakAlert = function() {
+            if ('speechSynthesis' in window) {
+              window.speechSynthesis.cancel();
+              var utterance = new SpeechSynthesisUtterance(speechText);
+              utterance.rate = 1.05;
+              utterance.pitch = 1.0;
+              utterance.volume = 1.0;
+              utterance.lang = 'en-US';
+              window.speechSynthesis.speak(utterance);
+            }
+          };
+
+          // Delay first speech slightly so initial siren catches attention immediately
+          setTimeout(speakAlert, 500);
+          FireShieldNotifications._speechInterval = setInterval(speakAlert, 8500);
         } catch (e) {
           console.log("AI voice call error:", e);
         }
       },
       stopAiVoiceCall: function() {
         try {
+          if (FireShieldNotifications._sirenInterval) {
+            clearInterval(FireShieldNotifications._sirenInterval);
+            FireShieldNotifications._sirenInterval = null;
+          }
+          if (FireShieldNotifications._speechInterval) {
+            clearInterval(FireShieldNotifications._speechInterval);
+            FireShieldNotifications._speechInterval = null;
+          }
+          if (FireShieldNotifications._sirenAudioCtx) {
+            FireShieldNotifications._sirenAudioCtx.close();
+            FireShieldNotifications._sirenAudioCtx = null;
+          }
           if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
           }

@@ -76,6 +76,8 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
   late final AnimationController _pulseController;
   late final Timer _timer;
   int _seconds = 0;
+  EscalationPhase _phase = EscalationPhase.verifying;
+  int _countdown = 30;
 
   @override
   void initState() {
@@ -93,12 +95,20 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
       }
     });
 
-    // Speak AI voice emergency broadcast
-    EmergencyDispatchService().triggerAiEmergencyCall(
+    // Start autonomous 30s/2m escalation sequence with continuous loud AI voice & siren sound
+    EmergencyDispatchService().startEscalationSequence(
       roomId: widget.roomId,
       temperature: widget.temperature,
       fireAngle: widget.fireAngle,
       riskScore: widget.riskScore,
+      onTick: (phase, countdownSec) {
+        if (mounted) {
+          setState(() {
+            _phase = phase;
+            _countdown = countdownSec;
+          });
+        }
+      },
     );
   }
 
@@ -106,7 +116,6 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
   void dispose() {
     _pulseController.dispose();
     _timer.cancel();
-    EmergencyDispatchService().stopAiEmergencyCall();
     super.dispose();
   }
 
@@ -296,7 +305,113 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
                 ),
                 const SizedBox(height: 14),
 
-                // 2.3 Critical Telemetry Highlight Card
+                // 2.3 Live Autonomous Escalation Status Banner (30s Direct Call -> 2m Fire Safety Dept)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _phase == EscalationPhase.fireSafetyDispatched
+                        ? const Color(0xFF7F1D1D).withValues(alpha: 0.6)
+                        : _phase == EscalationPhase.directCallDispatched
+                            ? const Color(0xFF831843).withValues(alpha: 0.5)
+                            : const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _phase == EscalationPhase.fireSafetyDispatched
+                          ? Colors.redAccent
+                          : _phase == EscalationPhase.directCallDispatched
+                              ? Colors.amber
+                              : const Color(0xFF334155),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Multi-Stage Visual Stepper
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildStepIndicator(
+                            step: '1',
+                            label: 'Alarm (30s)',
+                            isActive: _phase == EscalationPhase.verifying,
+                            isPassed: _phase != EscalationPhase.verifying,
+                          ),
+                          const Icon(Icons.arrow_forward_ios, size: 10, color: Colors.white30),
+                          _buildStepIndicator(
+                            step: '2',
+                            label: 'Direct Call',
+                            isActive: _phase == EscalationPhase.directCallDispatched,
+                            isPassed: _phase == EscalationPhase.fireSafetyDispatched,
+                          ),
+                          const Icon(Icons.arrow_forward_ios, size: 10, color: Colors.white30),
+                          _buildStepIndicator(
+                            step: '3',
+                            label: 'Fire Dept (2m)',
+                            isActive: _phase == EscalationPhase.fireSafetyDispatched,
+                            isPassed: false,
+                          ),
+                        ],
+                      ),
+                      const Divider(color: Color(0xFF334155), height: 16),
+                      // Dynamic Phase Message & Countdown
+                      Row(
+                        children: [
+                          Icon(
+                            _phase == EscalationPhase.fireSafetyDispatched
+                                ? Icons.local_fire_department
+                                : _phase == EscalationPhase.directCallDispatched
+                                    ? Icons.phone_forwarded
+                                    : Icons.timer_outlined,
+                            color: _phase == EscalationPhase.fireSafetyDispatched
+                                ? Colors.redAccent
+                                : _phase == EscalationPhase.directCallDispatched
+                                    ? Colors.amber
+                                    : const Color(0xFF38BDF8),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _phase == EscalationPhase.verifying
+                                      ? 'AUTO-DIALING DIRECT CALL IN $_countdown SEC'
+                                      : _phase == EscalationPhase.directCallDispatched
+                                          ? 'DIRECT CALL ACTIVE! ESCALATING IN $_countdown SEC'
+                                          : 'ESCALATED TO FIRE SAFETY AUTHORITIES (101)',
+                                  style: TextStyle(
+                                    color: _phase == EscalationPhase.fireSafetyDispatched
+                                        ? Colors.redAccent
+                                        : _phase == EscalationPhase.directCallDispatched
+                                            ? Colors.amber
+                                            : Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _phase == EscalationPhase.verifying
+                                      ? 'AI voice & siren sounding. If no one responds in 30s, call connects to ${widget.phone}.'
+                                      : _phase == EscalationPhase.directCallDispatched
+                                          ? 'Direct call & SMS active! If still unacknowledged at 2m, auto-escalates to Fire Safety.'
+                                          : 'Alert message dispatched directly to Fire Safety Department without intimation. Tap Cancel below if safe.',
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 2.4 Critical Telemetry Highlight Card
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -489,8 +604,8 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
                       ),
                     ],
                   ),
-                  onPressed: () {
-                    EmergencyDispatchService().stopAiEmergencyCall();
+                  onPressed: () async {
+                    await EmergencyDispatchService().cancelEscalation(roomId: widget.roomId);
                     widget.onIssueCleared();
                   },
                 ),
@@ -516,13 +631,16 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        'Confirm fire • Escalate to Emergency Services',
+                        'Confirm fire • Fast-Forward Direct Call & Fire Dept SOS',
                         style: TextStyle(fontSize: 10, color: Colors.redAccent),
                       ),
                     ],
                   ),
-                  onPressed: () {
-                    EmergencyDispatchService().stopAiEmergencyCall();
+                  onPressed: () async {
+                    final service = EmergencyDispatchService();
+                    service.stopEscalation();
+                    await service.executeDirectPhoneCall(widget.phone);
+                    await service.executeDirectPhoneCall(service.fireSafetyPhone);
                     widget.onEmergencyConfirmed();
                   },
                 ),
@@ -556,6 +674,50 @@ class _AiEmergencyCallDialogState extends State<AiEmergencyCallDialog>
       width: 1,
       height: 22,
       color: const Color(0xFF1E293B),
+    );
+  }
+
+  Widget _buildStepIndicator({
+    required String step,
+    required String label,
+    required bool isActive,
+    required bool isPassed,
+  }) {
+    final color = isPassed
+        ? AppColors.success
+        : isActive
+            ? AppColors.error
+            : const Color(0xFF64748B);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+            border: Border.all(color: color, width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: isPassed
+              ? const Icon(Icons.check, size: 10, color: AppColors.success)
+              : Text(
+                  step,
+                  style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
+                ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : const Color(0xFF94A3B8),
+            fontSize: 10,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 }

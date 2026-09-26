@@ -1,8 +1,17 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fireshield_app/core/services/web_notification_helper.dart';
+
+enum EscalationPhase {
+  idle,
+  verifying, // Phase 1: 0 - 30s countdown, AI voice siren active
+  directCallDispatched, // Phase 2: 30s timeout elapsed, direct call & SMS active
+  fireSafetyDispatched, // Phase 3: 120s / 2m timeout elapsed, dispatched to Fire Safety
+  cancelled, // User cancelled / issue cleared
+}
 
 class EmergencyDispatchService {
   static final EmergencyDispatchService _instance = EmergencyDispatchService._internal();
@@ -16,7 +25,16 @@ class EmergencyDispatchService {
   final Dio _dio = Dio();
   String userEmail = 'user.safety@fireshield.ai';
   String userPhone = '+1 555-0199';
+  String fireSafetyPhone = '101'; // Default Fire Safety Department (101 in India, 911 in US)
   bool autoDispatchEnabled = true;
+
+  Timer? _escalationTimer;
+  int _totalElapsedSeconds = 0;
+  EscalationPhase _escalationPhase = EscalationPhase.idle;
+  void Function(EscalationPhase phase, int countdownSec)? onEscalationTick;
+
+  EscalationPhase get currentEscalationPhase => _escalationPhase;
+  int get totalElapsedSeconds => _totalElapsedSeconds;
 
   final Set<String> _dispatchedEvents = {};
 
@@ -28,19 +46,29 @@ class EmergencyDispatchService {
       final prefs = await SharedPreferences.getInstance();
       userEmail = prefs.getString('emergency_email') ?? userEmail;
       userPhone = prefs.getString('emergency_phone') ?? userPhone;
+      fireSafetyPhone = prefs.getString('fire_safety_phone') ?? fireSafetyPhone;
       autoDispatchEnabled = prefs.getBool('auto_dispatch_alerts') ?? true;
-      debugPrint('ℹ️ Emergency Contacts initialized: $userEmail | $userPhone');
+      debugPrint('ℹ️ Emergency Contacts initialized: $userEmail | $userPhone | Fire Dept: $fireSafetyPhone');
     } catch (_) {}
   }
 
-  Future<void> updateContacts({required String email, required String phone, required bool autoDispatch}) async {
+  Future<void> updateContacts({
+    required String email,
+    required String phone,
+    String? fireDeptPhone,
+    required bool autoDispatch,
+  }) async {
     userEmail = email.trim();
     userPhone = phone.trim();
+    if (fireDeptPhone != null && fireDeptPhone.trim().isNotEmpty) {
+      fireSafetyPhone = fireDeptPhone.trim();
+    }
     autoDispatchEnabled = autoDispatch;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('emergency_email', userEmail);
       await prefs.setString('emergency_phone', userPhone);
+      await prefs.setString('fire_safety_phone', fireSafetyPhone);
       await prefs.setBool('auto_dispatch_alerts', autoDispatch);
     } catch (_) {}
   }
@@ -138,6 +166,139 @@ class EmergencyDispatchService {
     final cleanPhone = _sanitizePhoneForSms(userPhone);
     final url = cleanPhone.isNotEmpty ? 'tel:$cleanPhone' : 'tel:911';
     openExternalUrl(url);
+  }
+
+  Future<void> executeDirectPhoneCall(String phone) async {
+    final cleanPhone = _sanitizePhoneForSms(phone);
+    if (cleanPhone.isEmpty) return;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _telephonyChannel.invokeMethod('directCall', {'phone': cleanPhone});
+        debugPrint('📞 Direct native Android call placed to: $cleanPhone');
+        return;
+      } catch (e) {
+        debugPrint('⚠️ Direct native call error: $e');
+      }
+    }
+    openExternalUrl('tel:$cleanPhone');
+  }
+
+  Future<void> executeDirectSms({required String phone, required String message}) async {
+    final cleanPhone = _sanitizePhoneForSms(phone);
+    if (cleanPhone.isEmpty) return;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _telephonyChannel.invokeMethod('directSms', {
+          'phone': cleanPhone,
+          'message': message,
+        });
+        debugPrint('💬 Direct native Android SMS sent to: $cleanPhone');
+        return;
+      } catch (e) {
+        debugPrint('⚠️ Direct native SMS error: $e');
+      }
+    }
+  }
+
+  /// Starts the multi-stage autonomous emergency escalation:
+  /// Stage 1 (0 to 30s): In-app verification window with loud continuous AI voice & siren sound
+  /// Stage 2 (30s): No response -> Direct Call & SMS auto-dialed to user phone
+  /// Stage 3 (120s / 2m): Still no response -> Dispatched directly to Fire Safety Department (101) without intimation
+  void startEscalationSequence({
+    required String roomId,
+    required double temperature,
+    required int fireAngle,
+    required double riskScore,
+    void Function(EscalationPhase phase, int countdownSec)? onTick,
+  }) {
+    stopEscalation();
+    onEscalationTick = onTick;
+    _escalationPhase = EscalationPhase.verifying;
+    _totalElapsedSeconds = 0;
+
+    // 1. Loudspeaker Continuous AI Voice Alert & Emergency Siren
+    triggerAiEmergencyCall(
+      roomId: roomId,
+      temperature: temperature,
+      fireAngle: fireAngle,
+      riskScore: riskScore,
+    );
+
+    // Initial tick: 30s countdown
+    onEscalationTick?.call(EscalationPhase.verifying, 30);
+
+    // 2. Start 1-second interval escalation state machine
+    _escalationTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      _totalElapsedSeconds++;
+
+      // Phase 1 (0 to 30s): In-app verification window
+      if (_totalElapsedSeconds < 30) {
+        final remaining = 30 - _totalElapsedSeconds;
+        onEscalationTick?.call(EscalationPhase.verifying, remaining);
+      }
+      // Phase 2 (At exactly 30s): No one responded -> Activate Direct Call & SMS to Primary Contact
+      else if (_totalElapsedSeconds == 30) {
+        _escalationPhase = EscalationPhase.directCallDispatched;
+        debugPrint('⏱️ 30s elapsed with NO user response! Activating Direct Call to $userPhone...');
+
+        await executeDirectPhoneCall(userPhone);
+        await executeDirectSms(
+          phone: userPhone,
+          message: '🚨 [FireShield AI URGENT] No response for 30s! Critical fire in $roomId (${temperature.toStringAsFixed(1)}°C, $fireAngle°). Evacuate immediately!',
+        );
+
+        onEscalationTick?.call(EscalationPhase.directCallDispatched, 90);
+      }
+      // Phase 2 (31s to 120s): Direct call active, counting down remaining to 2 minutes
+      else if (_totalElapsedSeconds < 120) {
+        final remainingToFireSafety = 120 - _totalElapsedSeconds;
+        onEscalationTick?.call(EscalationPhase.directCallDispatched, remainingToFireSafety);
+      }
+      // Phase 3 (At exactly 120s / 2 minutes): Still no response -> Dispatch directly to Fire Safety Department
+      else if (_totalElapsedSeconds == 120) {
+        _escalationPhase = EscalationPhase.fireSafetyDispatched;
+        debugPrint('⏱️ 2 minutes elapsed with NO user response! ESCALATING DIRECTLY TO FIRE SAFETY ($fireSafetyPhone)...');
+
+        await executeDirectPhoneCall(fireSafetyPhone);
+        await executeDirectSms(
+          phone: fireSafetyPhone,
+          message: '🚨 [FIRE EMERGENCY DISPATCH] Autonomous Alarm: Confirmed unacknowledged structure fire in $roomId. Temp: ${temperature.toStringAsFixed(1)}°C. Bearing: $fireAngle°. AI Risk: ${riskScore.toStringAsFixed(0)}%. IMMEDIATE DISPATCH REQUIRED!',
+        );
+
+        // Also broadcast cloud urgent dispatch
+        await sendEmergencyVerificationNotice(
+          alertId: 'fire_safety_dispatch_${DateTime.now().millisecondsSinceEpoch}',
+          roomId: roomId,
+          temperature: temperature,
+          fireAngle: fireAngle,
+          riskScore: riskScore,
+        );
+
+        onEscalationTick?.call(EscalationPhase.fireSafetyDispatched, 0);
+      } else {
+        onEscalationTick?.call(EscalationPhase.fireSafetyDispatched, 0);
+      }
+    });
+  }
+
+  Future<void> cancelEscalation({String? roomId}) async {
+    _escalationTimer?.cancel();
+    _escalationTimer = null;
+    _escalationPhase = EscalationPhase.cancelled;
+    _totalElapsedSeconds = 0;
+    stopAiEmergencyCall();
+
+    if (roomId != null) {
+      await sendAllClearConfirmation(roomId: roomId);
+    }
+  }
+
+  void stopEscalation() {
+    _escalationTimer?.cancel();
+    _escalationTimer = null;
+    _escalationPhase = EscalationPhase.idle;
+    _totalElapsedSeconds = 0;
+    stopAiEmergencyCall();
   }
 
   /// Directly executes an immediate, autonomous emergency dispatch:

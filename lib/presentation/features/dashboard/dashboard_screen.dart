@@ -30,6 +30,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final service = EmergencyDispatchService();
     final emailController = TextEditingController(text: service.userEmail);
     final phoneController = TextEditingController(text: service.userPhone);
+    final fireDeptController = TextEditingController(text: service.fireSafetyPhone);
     bool autoDispatch = service.autoDispatchEnabled;
 
     showModalBottomSheet(
@@ -115,6 +116,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: fireDeptController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Fire Dept SOS Number (2-Min Auto Escalation)',
+                  hintText: 'e.g. 101 or 911',
+                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  prefixIcon: const Icon(Icons.local_fire_department, color: Colors.redAccent),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
               const SizedBox(height: 14),
               Container(
                 decoration: BoxDecoration(
@@ -131,7 +148,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   subtitle: Text(
                     autoDispatch
-                        ? 'Active: Directly dials emergency call & sends SMS immediately upon fire detection without asking'
+                        ? 'Active: 30s in-app verification -> direct call to contact -> 2m auto-escalation to Fire Safety Department'
                         : 'Manual: Prompts with verification dialog first',
                     style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                   ),
@@ -160,9 +177,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       onPressed: () async {
                         final email = emailController.text;
                         final phone = phoneController.text;
+                        final fireDept = fireDeptController.text;
                         await service.updateContacts(
                           email: email,
                           phone: phone,
+                          fireDeptPhone: fireDept,
                           autoDispatch: autoDispatch,
                         );
                         if (!mounted) return;
