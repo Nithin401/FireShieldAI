@@ -24,6 +24,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _currentScenario = 'NORMAL';
+  bool _hasDispatchedHardwareAlert = false;
 
   void _showContactSetupModal() {
     final service = EmergencyDispatchService();
@@ -112,6 +113,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   filled: true,
                   fillColor: const Color(0xFF1E293B),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: autoDispatch ? AppColors.error.withValues(alpha: 0.5) : const Color(0xFF334155),
+                  ),
+                ),
+                child: SwitchListTile(
+                  title: const Text(
+                    'Instant Auto-Dispatch (Zero-Click)',
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    autoDispatch
+                        ? 'Active: Directly dials emergency call & sends SMS immediately upon fire detection without asking'
+                        : 'Manual: Prompts with verification dialog first',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                  value: autoDispatch,
+                  activeTrackColor: AppColors.error,
+                  onChanged: (val) {
+                    setModalState(() {
+                      autoDispatch = val;
+                    });
+                  },
                 ),
               ),
               const SizedBox(height: 16),
@@ -203,20 +233,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       );
 
-      // Dispatch verification notification to User Messages & Mail
-      await EmergencyDispatchService().sendEmergencyVerificationNotice(
-        alertId: alertId,
-        roomId: 'Kitchen',
-        temperature: 76.5,
-        fireAngle: 45,
-        riskScore: 99.4,
-      );
+      final dispatchService = EmergencyDispatchService();
+      if (dispatchService.autoDispatchEnabled) {
+        // Immediate Autonomous Dispatch: Direct phone call + Direct SMS + Loudspeaker Siren
+        await dispatchService.executeImmediateAutonomousDispatch(
+          roomId: 'Kitchen',
+          temperature: 76.5,
+          fireAngle: 45,
+          riskScore: 99.4,
+        );
+      } else {
+        // Dispatch verification notification to User Messages & Mail
+        await dispatchService.sendEmergencyVerificationNotice(
+          alertId: alertId,
+          roomId: 'Kitchen',
+          temperature: 76.5,
+          fireAngle: 45,
+          riskScore: 99.4,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.red,
-            content: Text('🔥 Fire Anomaly detected! AI Emergency Voice Call active for ${EmergencyDispatchService().userPhone}...'),
+            content: Text('🔥 Fire Anomaly detected! Immediate Autonomous Emergency Call & SMS active for ${dispatchService.userPhone}...'),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -228,8 +269,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           temperature: 76.5,
           fireAngle: 45,
           riskScore: 99.4,
-          email: EmergencyDispatchService().userEmail,
-          phone: EmergencyDispatchService().userPhone,
+          email: dispatchService.userEmail,
+          phone: dispatchService.userPhone,
           onIssueCleared: () => _handleIssueCleared('Kitchen'),
           onEmergencyConfirmed: () => _handleEmergencyConfirmed('Kitchen'),
         );
@@ -338,6 +379,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Automated listener: If live hardware detects critical fire, trigger immediate autonomous dispatch
+    ref.listen<AsyncValue<List<DeviceModel>>>(devicesStreamProvider, (previous, next) {
+      final devices = next.value ?? [];
+      final criticalDevice = devices.cast<DeviceModel?>().firstWhere(
+        (d) => d != null && (d.fireState == 'FIRE' || d.riskScore >= 80.0),
+        orElse: () => null,
+      );
+
+      if (criticalDevice != null && !_hasDispatchedHardwareAlert) {
+        _hasDispatchedHardwareAlert = true;
+        final service = EmergencyDispatchService();
+        if (service.autoDispatchEnabled) {
+          service.executeImmediateAutonomousDispatch(
+            roomId: criticalDevice.room,
+            temperature: criticalDevice.ambientTemperature,
+            fireAngle: criticalDevice.fireAngle,
+            riskScore: criticalDevice.riskScore,
+          );
+        }
+      } else if (criticalDevice == null) {
+        _hasDispatchedHardwareAlert = false;
+      }
+    });
+
     final devicesAsync = ref.watch(devicesStreamProvider);
     final notifications = ref.watch(mockNotificationsProvider);
     final unreadCriticalCount = notifications.where((n) => !n.isRead && n.severity == 'critical').length;

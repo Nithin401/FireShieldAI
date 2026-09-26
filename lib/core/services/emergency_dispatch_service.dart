@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fireshield_app/core/services/web_notification_helper.dart';
 
@@ -130,11 +131,71 @@ class EmergencyDispatchService {
     stopAiVoiceCall();
   }
 
+  static const MethodChannel _telephonyChannel = MethodChannel('fireshield/telephony');
+
   /// Directly dials the user's configured SOS phone number
   void dialSosEmergencyCall() {
     final cleanPhone = _sanitizePhoneForSms(userPhone);
     final url = cleanPhone.isNotEmpty ? 'tel:$cleanPhone' : 'tel:911';
     openExternalUrl(url);
+  }
+
+  /// Directly executes an immediate, autonomous emergency dispatch:
+  /// - Real direct phone call (auto-dialed without user confirmation)
+  /// - Real direct SMS message (auto-sent in background)
+  /// - Full-screen AI voice alert on loudspeaker
+  /// - Urgent cloud push notification & siren
+  Future<void> executeImmediateAutonomousDispatch({
+    required String roomId,
+    required double temperature,
+    required int fireAngle,
+    required double riskScore,
+  }) async {
+    final cleanPhone = _sanitizePhoneForSms(userPhone);
+
+    // 1. Immediately trigger the AI voice alert & siren on loudspeaker
+    triggerAiEmergencyCall(
+      roomId: roomId,
+      temperature: temperature,
+      fireAngle: fireAngle,
+      riskScore: riskScore,
+    );
+
+    // 2. Direct Cellular Phone Call (Free via Device SIM)
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && cleanPhone.isNotEmpty) {
+      try {
+        await _telephonyChannel.invokeMethod('directCall', {'phone': cleanPhone});
+        debugPrint('📞 Direct native Android call placed to: $cleanPhone');
+      } catch (e) {
+        debugPrint('⚠️ Direct native call error, falling back to OS dialer: $e');
+        dialSosEmergencyCall();
+      }
+    } else {
+      dialSosEmergencyCall();
+    }
+
+    // 3. Direct Background SMS Message (Free via Device SIM)
+    final smsBody = '🚨 [FireShield AI CRITICAL FIRE ALERT] Active fire detected in $roomId (${temperature.toStringAsFixed(1)}°C, angle $fireAngle°)! AI Risk: ${riskScore.toStringAsFixed(0)}%. Immediate action required!';
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && cleanPhone.isNotEmpty) {
+      try {
+        await _telephonyChannel.invokeMethod('directSms', {
+          'phone': cleanPhone,
+          'message': smsBody,
+        });
+        debugPrint('💬 Direct native Android SMS sent to: $cleanPhone');
+      } catch (e) {
+        debugPrint('ℹ️ Direct SMS notice: $e');
+      }
+    }
+
+    // 4. Send cloud notifications & webhooks (ntfy / backend)
+    await sendEmergencyVerificationNotice(
+      alertId: 'auto_call_${DateTime.now().millisecondsSinceEpoch}',
+      roomId: roomId,
+      temperature: temperature,
+      fireAngle: fireAngle,
+      riskScore: riskScore,
+    );
   }
 
   /// Sends emergency verification notifications through the app to the user's Messages and Mail

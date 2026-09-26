@@ -14,8 +14,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _emailController = TextEditingController(text: 'admin@fireshield.io');
+  final _passwordController = TextEditingController(text: 'Password123!');
   bool _isLoading = false;
   String? _errorMessage;
 
