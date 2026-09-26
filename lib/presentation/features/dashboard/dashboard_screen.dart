@@ -396,6 +396,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ref.invalidate(devicesStreamProvider);
   }
 
+  void _triggerDeviceTest() {
+    requestNotificationPermission();
+    triggerSystemNotification(
+      '🔔 FireShield AI Device Test',
+      'Your device is connected and ready to receive real-time emergency fire alerts!',
+      'critical',
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Colors.blue,
+        content: Text('🔔 Sent test alert to this device! Tap "Allow" if your browser prompts.'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _syncTelemetry() {
+    ref.invalidate(devicesStreamProvider);
+    ref.invalidate(notificationsStreamProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Telemetry & AI Engine Synchronized')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Automated listener: If live hardware detects critical fire, trigger immediate autonomous dispatch
@@ -426,87 +450,150 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final notifications = ref.watch(mockNotificationsProvider);
     final unreadCriticalCount = notifications.where((n) => !n.isRead && n.severity == 'critical').length;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobileScreen = screenWidth < 640;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B1120),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         elevation: 0,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
               '🛡️ FireShield AI',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppColors.success),
+            if (isMobileScreen)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.success),
+                ),
+                child: const Text(
+                  'LIVE OPS',
+                  style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
               ),
-              child: const Text(
-                'LIVE OPS',
-                style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.contact_phone_outlined),
-            tooltip: 'Configure Alert Contacts (Mobile & Mail)',
-            onPressed: _showContactSetupModal,
-          ),
-          IconButton(
-            icon: const Icon(Icons.phonelink_ring_outlined),
-            tooltip: 'Test Device Notification',
-            onPressed: () {
-              requestNotificationPermission();
-              triggerSystemNotification(
-                '🔔 FireShield AI Device Test',
-                'Your device is connected and ready to receive real-time emergency fire alerts!',
-                'critical',
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  backgroundColor: Colors.blue,
-                  content: Text('🔔 Sent test alert to this device! Tap "Allow" if your browser prompts.'),
-                  duration: Duration(seconds: 3),
+        actions: isMobileScreen
+            ? [
+                IconButton(
+                  icon: unreadCriticalCount > 0
+                      ? Badge.count(
+                          count: unreadCriticalCount,
+                          backgroundColor: AppColors.error,
+                          child: const Icon(Icons.notifications_active),
+                        )
+                      : const Icon(Icons.notifications_outlined),
+                  onPressed: () {
+                    context.push('/notifications');
+                  },
                 ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sync Telemetry',
-            onPressed: () {
-              ref.invalidate(devicesStreamProvider);
-              ref.invalidate(notificationsStreamProvider);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Telemetry & AI Engine Synchronized')),
-              );
-            },
-          ),
-          IconButton(
-            icon: unreadCriticalCount > 0
-                ? Badge.count(
-                    count: unreadCriticalCount,
-                    backgroundColor: AppColors.error,
-                    child: const Icon(Icons.notifications_active),
-                  )
-                : const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              context.push('/notifications');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle),
-            onPressed: () {
-              context.push('/settings');
-            },
-          ),
-        ],
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white70),
+                  color: const Color(0xFF1E293B),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  onSelected: (val) {
+                    if (val == 'contacts') _showContactSetupModal();
+                    if (val == 'test') _triggerDeviceTest();
+                    if (val == 'sync') _syncTelemetry();
+                    if (val == 'settings') context.push('/settings');
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'contacts',
+                      child: Row(
+                        children: [
+                          Icon(Icons.phone_in_talk_rounded, color: Color(0xFF38BDF8), size: 18),
+                          SizedBox(width: 10),
+                          Text('Alert Contacts & Auto-Dispatch', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'test',
+                      child: Row(
+                        children: [
+                          Icon(Icons.phonelink_ring_outlined, color: Colors.amber, size: 18),
+                          SizedBox(width: 10),
+                          Text('Test Device Alert', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'sync',
+                      child: Row(
+                        children: [
+                          Icon(Icons.sync, color: AppColors.success, size: 18),
+                          SizedBox(width: 10),
+                          Text('Sync Telemetry', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 8),
+                    const PopupMenuItem(
+                      value: 'settings',
+                      child: Row(
+                        children: [
+                          Icon(Icons.settings_outlined, color: Colors.white70, size: 18),
+                          SizedBox(width: 10),
+                          Text('Account Settings', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.contact_phone_outlined),
+                  tooltip: 'Configure Alert Contacts (Mobile & Mail)',
+                  onPressed: _showContactSetupModal,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.phonelink_ring_outlined),
+                  tooltip: 'Test Device Notification',
+                  onPressed: _triggerDeviceTest,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.sync),
+                  tooltip: 'Sync Telemetry',
+                  onPressed: _syncTelemetry,
+                ),
+                IconButton(
+                  icon: unreadCriticalCount > 0
+                      ? Badge.count(
+                          count: unreadCriticalCount,
+                          backgroundColor: AppColors.error,
+                          child: const Icon(Icons.notifications_active),
+                        )
+                      : const Icon(Icons.notifications_outlined),
+                  onPressed: () {
+                    context.push('/notifications');
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.account_circle),
+                  onPressed: () {
+                    context.push('/settings');
+                  },
+                ),
+              ],
       ),
       body: devicesAsync.when(
         data: (devices) {
@@ -558,69 +645,110 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Alert Routing & Connected Contacts Bar
+                      // 1. Sleek Emergency Dispatch & Contacts Bar
                       InkWell(
                         onTap: _showContactSetupModal,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         child: Container(
                           width: double.infinity,
                           margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: EmergencyDispatchService().isCustomContactConfigured
-                                  ? const Color(0xFF334155)
-                                  : Colors.amber.withValues(alpha: 0.8),
-                              width: EmergencyDispatchService().isCustomContactConfigured ? 1 : 1.5,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF131D31), Color(0xFF0F172A)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: EmergencyDispatchService().autoDispatchEnabled
+                                  ? const Color(0xFF0284C7).withValues(alpha: 0.5)
+                                  : const Color(0xFF334155),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.phonelink_ring_outlined,
-                                color: EmergencyDispatchService().isCustomContactConfigured
-                                    ? const Color(0xFF38BDF8)
-                                    : Colors.amber,
-                                size: 20,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: (EmergencyDispatchService().isCustomContactConfigured
+                                          ? const Color(0xFF0284C7)
+                                          : Colors.amber)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  EmergencyDispatchService().isCustomContactConfigured
+                                      ? Icons.phone_in_talk_rounded
+                                      : Icons.contact_phone_outlined,
+                                  color: EmergencyDispatchService().isCustomContactConfigured
+                                      ? const Color(0xFF38BDF8)
+                                      : Colors.amber,
+                                  size: 18,
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          EmergencyDispatchService().isCustomContactConfigured
+                                              ? 'Active Auto-Dispatch'
+                                              : 'Setup Emergency Contacts',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.success.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            '30s / 2m SOS',
+                                            style: TextStyle(
+                                              color: AppColors.success,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
                                     Text(
                                       EmergencyDispatchService().isCustomContactConfigured
-                                          ? 'Alerts routed to: ${EmergencyDispatchService().userPhone} | ${EmergencyDispatchService().userEmail}'
-                                          : '⚠️ Configure Mobile & Mail for real fire alerts ↗',
-                                      style: TextStyle(
-                                        color: EmergencyDispatchService().isCustomContactConfigured
-                                            ? const Color(0xFFCBD5E1)
-                                            : Colors.amber,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                                          ? '${EmergencyDispatchService().userPhone} • Fire Dept: ${EmergencyDispatchService().fireSafetyPhone}'
+                                          : 'Tap to configure mobile & fire department numbers',
+                                      style: const TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 11,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    const Text(
-                                      'Sends real SMS, WhatsApp, & Mail with YES/NO home check',
-                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 10),
-                                    ),
                                   ],
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF334155),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Setup',
-                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
+                              const Icon(
+                                Icons.tune_rounded,
+                                color: Color(0xFF94A3B8),
+                                size: 18,
                               ),
                             ],
                           ),
