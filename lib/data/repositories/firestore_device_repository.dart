@@ -110,24 +110,30 @@ class FirestoreDeviceRepository implements DeviceRepository {
           }
 
           if (latestReading != null) {
-            final double temp = (latestReading['temperature'] as num?)?.toDouble() ?? 26.0;
-            final double hum = (latestReading['humidity'] as num?)?.toDouble() ?? 50.0;
+            final double temp = (latestReading['temperature_c'] ?? latestReading['temperature'] as num?)?.toDouble() ?? 26.0;
+            final double hum = (latestReading['humidity_percent'] ?? latestReading['humidity'] as num?)?.toDouble() ?? 50.0;
             final int flameRaw = (latestReading['flame_raw'] as num?)?.toInt() ?? 14500;
             final int gasRaw = (latestReading['gas_raw'] as num?)?.toInt() ?? 18000;
             final int servoAngle = (latestReading['servo_angle'] as num?)?.toInt() ?? 90;
             final int flameDigital = (latestReading['flame_digital'] as num?)?.toInt() ?? 0;
             final String fireStateStr =
                 latestReading['fire_state']?.toString().toUpperCase() ?? 'NORMAL';
+            final String zoneIdStr = latestReading['zone_id']?.toString() ?? 'ZONE_1';
+            final double serverRiskScore = (latestReading['risk_score'] as num?)?.toDouble() ?? 0.0;
+            final String responderStatusStr = latestReading['responder_status']?.toString() ?? 'IDLE';
 
             final bool isFire =
                 flameDigital == 1 || fireStateStr == 'FIRE' || fireStateStr == 'CRITICAL';
             final bool isWarning = fireStateStr == 'WARNING' || fireStateStr == 'PRE_FIRE';
+            final double computedRisk = serverRiskScore > 0.0 
+                ? serverRiskScore 
+                : (isFire ? 98.5 : (isWarning ? 45.0 : 6.0));
 
             final index = _currentDevices.indexWhere((d) => d.id == 'ESP1');
             final esp1Updated = DeviceModel(
               id: 'ESP1',
-              name: 'ESP1 Multi-Sensor & Radar Node',
-              room: 'Main Living Room',
+              name: 'ESP1 Multi-Sensor & Radar Node ($zoneIdStr)',
+              room: zoneIdStr,
               latitude: 17.3850,
               longitude: 78.4867,
               firmwareVersion: 'v2.1-RTDB',
@@ -143,8 +149,8 @@ class FirestoreDeviceRepository implements DeviceRepository {
               smokeRaw: gasRaw,
               fireAngle: servoAngle,
               fireState: isFire ? 'FIRE' : (isWarning ? 'WARNING' : 'SAFE'),
-              responseStatus: isFire ? 'ACTIVE' : 'IDLE',
-              riskScore: isFire ? 98.5 : (isWarning ? 45.0 : 6.0),
+              responseStatus: responderStatusStr != 'IDLE' ? responderStatusStr : (isFire ? 'ACTIVE' : 'IDLE'),
+              riskScore: computedRisk,
             );
 
             if (index != -1) {

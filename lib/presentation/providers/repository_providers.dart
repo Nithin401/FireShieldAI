@@ -6,6 +6,7 @@ import 'package:fireshield_app/data/repositories/mock_device_repository.dart';
 import 'package:fireshield_app/data/repositories/mock_hardware_protocol_repository.dart';
 import 'package:fireshield_app/data/repositories/mock_notification_repository.dart';
 import 'package:fireshield_app/data/repositories/mock_report_repository.dart';
+import 'package:fireshield_app/data/repositories/firebase_report_repository.dart';
 import 'package:fireshield_app/domain/models/device_model.dart';
 import 'package:fireshield_app/domain/models/notification_model.dart';
 import 'package:fireshield_app/domain/repositories/auth_repository.dart';
@@ -48,6 +49,9 @@ final hardwareProtocolRepositoryProvider = Provider<HardwareProtocolRepository>(
 });
 
 final reportRepositoryProvider = Provider<ReportRepository>((ref) {
+  if (useRealBackend) {
+    return FirebaseReportRepository();
+  }
   return MockReportRepository();
 });
 
