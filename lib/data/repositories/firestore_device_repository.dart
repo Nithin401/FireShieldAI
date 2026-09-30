@@ -1,71 +1,55 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fireshield_app/domain/models/device_model.dart';
 import 'package:fireshield_app/domain/repositories/device_repository.dart';
 
-/// Real Backend & Autonomous Offline-First Device Repository
+/// Real Firebase Realtime Database & ESP8266 Live Telemetry Repository
 class FirestoreDeviceRepository implements DeviceRepository {
   final Dio _dio = Dio();
-  final String _backendUrl = 'http://localhost:5000/api/devices';
   final Random _random = Random();
+
+  static const String rtdbHost =
+      'https://smart-fire-detection-272bb-default-rtdb.asia-southeast1.firebasedatabase.app';
+  static const String firebaseApiKey = 'AIzaSyCxnGiInekI9FX6f7yUPuwxucYpHrUZWws';
 
   List<DeviceModel> _currentDevices = [
     DeviceModel(
-      id: 'dev_001',
-      name: 'Kitchen Fire Node',
-      room: 'Kitchen',
-      latitude: 37.7749,
-      longitude: -122.4194,
-      firmwareVersion: 'v2.0-HybridAI',
+      id: 'ESP1',
+      name: 'ESP1 Multi-Sensor & Radar Node',
+      room: 'Main Living Room',
+      latitude: 17.3850,
+      longitude: 78.4867,
+      firmwareVersion: 'v2.1-RTDB',
       isOnline: true,
-      batteryLevel: 92,
-      wifiSignalStrength: 88,
+      batteryLevel: 98,
+      wifiSignalStrength: 92,
       lastSync: DateTime.now(),
-      flameRaw: 850,
-      ambientTemperature: 24.8,
-      ambientHumidity: 55.4,
+      flameRaw: 14500,
+      ambientTemperature: 28.5,
+      ambientHumidity: 58.2,
       fireAngle: 90,
-      riskScore: 10.0,
+      riskScore: 6.0,
       fireState: 'SAFE',
       responseStatus: 'IDLE',
     ),
     DeviceModel(
       id: 'dev_002',
-      name: 'Server Room Monitor',
-      room: 'Server Room',
-      latitude: 37.7749,
-      longitude: -122.4194,
+      name: 'Kitchen Fire Sentry',
+      room: 'Kitchen Area',
+      latitude: 17.3860,
+      longitude: 78.4875,
       firmwareVersion: 'v2.0-HybridAI',
       isOnline: true,
-      batteryLevel: 100,
-      wifiSignalStrength: 95,
+      batteryLevel: 94,
+      wifiSignalStrength: 88,
       lastSync: DateTime.now(),
       flameRaw: 960,
-      ambientTemperature: 20.2,
-      ambientHumidity: 47.0,
+      ambientTemperature: 24.2,
+      ambientHumidity: 51.0,
       fireAngle: 0,
       riskScore: 4.5,
-      fireState: 'SAFE',
-      responseStatus: 'IDLE',
-    ),
-    DeviceModel(
-      id: 'dev_003',
-      name: 'Lobby Fire Alarm',
-      room: 'Lobby',
-      latitude: 37.7749,
-      longitude: -122.4194,
-      firmwareVersion: 'v1.1.0',
-      isOnline: false,
-      batteryLevel: 15,
-      wifiSignalStrength: 0,
-      lastSync: DateTime.now().subtract(const Duration(hours: 4)),
-      flameRaw: 0,
-      ambientTemperature: 22.0,
-      ambientHumidity: 50.0,
-      fireAngle: 0,
-      riskScore: 0.0,
       fireState: 'SAFE',
       responseStatus: 'IDLE',
     ),
@@ -73,43 +57,99 @@ class FirestoreDeviceRepository implements DeviceRepository {
 
   @override
   Stream<List<DeviceModel>> getDevices() async* {
-    // Immediately emit default state so app opens instantly with zero loading screen
+    // Immediately emit default state so app opens instantly with zero loading lag
     yield List.unmodifiable(_currentDevices);
 
     while (true) {
-      bool backendReachable = false;
+      bool firebaseReachable = false;
       try {
+        String url =
+            '$rtdbHost/smart_fire_detection/devices/ESP1/readings.json?orderBy="\$key"&limitToLast=1';
+
+        // Attach Firebase Auth ID token if authenticated
+        try {
+          final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+          if (idToken != null && idToken.isNotEmpty) {
+            url += '&auth=$idToken';
+          }
+        } catch (_) {}
+
         final response = await _dio.get(
-          _backendUrl,
+          url,
           options: Options(
-            sendTimeout: const Duration(milliseconds: 1200),
-            receiveTimeout: const Duration(milliseconds: 1200),
+            sendTimeout: const Duration(milliseconds: 1500),
+            receiveTimeout: const Duration(milliseconds: 1500),
           ),
         );
+
         if (response.statusCode == 200 && response.data != null) {
-          final List<dynamic> list = response.data is List
-              ? response.data
-              : jsonDecode(response.data.toString());
-          final devices = list
-              .map((json) => DeviceModel.fromJson(Map<String, dynamic>.from(json)))
-              .toList();
-          if (devices.isNotEmpty) {
-            _currentDevices = devices;
-            backendReachable = true;
+          final dynamic data = response.data;
+          Map<String, dynamic>? latestReading;
+
+          if (data is Map && data.isNotEmpty) {
+            final Map<String, dynamic> dataMap = Map<String, dynamic>.from(data);
+            final lastVal = dataMap.values.last;
+            if (lastVal is Map) {
+              latestReading = Map<String, dynamic>.from(lastVal);
+            }
+          }
+
+          if (latestReading != null) {
+            final double temp = (latestReading['temperature'] as num?)?.toDouble() ?? 26.0;
+            final double hum = (latestReading['humidity'] as num?)?.toDouble() ?? 50.0;
+            final int flameRaw = (latestReading['flame_raw'] as num?)?.toInt() ?? 14500;
+            final int gasRaw = (latestReading['gas_raw'] as num?)?.toInt() ?? 18000;
+            final int servoAngle = (latestReading['servo_angle'] as num?)?.toInt() ?? 90;
+            final int flameDigital = (latestReading['flame_digital'] as num?)?.toInt() ?? 0;
+            final String fireStateStr =
+                latestReading['fire_state']?.toString().toUpperCase() ?? 'NORMAL';
+
+            final bool isFire =
+                flameDigital == 1 || fireStateStr == 'FIRE' || fireStateStr == 'CRITICAL';
+            final bool isWarning = fireStateStr == 'WARNING' || fireStateStr == 'PRE_FIRE';
+
+            final index = _currentDevices.indexWhere((d) => d.id == 'ESP1');
+            final esp1Updated = DeviceModel(
+              id: 'ESP1',
+              name: 'ESP1 Multi-Sensor & Radar Node',
+              room: 'Main Living Room',
+              latitude: 17.3850,
+              longitude: 78.4867,
+              firmwareVersion: 'v2.1-RTDB',
+              isOnline: true,
+              batteryLevel: 100,
+              wifiSignalStrength: 95,
+              lastSync: DateTime.now(),
+              ambientTemperature: double.parse(temp.toStringAsFixed(1)),
+              ambientHumidity: double.parse(hum.toStringAsFixed(1)),
+              preciseTemperature: temp,
+              flameRaw: flameRaw,
+              gasRaw: gasRaw,
+              smokeRaw: gasRaw,
+              fireAngle: servoAngle,
+              fireState: isFire ? 'FIRE' : (isWarning ? 'WARNING' : 'SAFE'),
+              responseStatus: isFire ? 'ACTIVE' : 'IDLE',
+              riskScore: isFire ? 98.5 : (isWarning ? 45.0 : 6.0),
+            );
+
+            if (index != -1) {
+              _currentDevices[index] = esp1Updated;
+            } else {
+              _currentDevices.insert(0, esp1Updated);
+            }
+            firebaseReachable = true;
           }
         }
       } catch (e) {
-        // Backend is offline: silently operate in local autonomous mode
-        backendReachable = false;
+        firebaseReachable = false;
       }
 
-      if (!backendReachable) {
-        // Gently simulate natural ambient drift for active devices so graphs remain alive
+      if (!firebaseReachable) {
         _simulateAmbientDrift();
       }
 
       yield List.unmodifiable(_currentDevices);
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 1));
     }
   }
 

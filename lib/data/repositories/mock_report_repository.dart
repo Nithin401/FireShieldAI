@@ -39,6 +39,6 @@ class MockReportRepository implements ReportRepository {
 
   @override
   Future<void> exportReportAsCsv(String period) async {
-    TelemetryMlExportService.exportTelemetryCsv(period: period);
+    await TelemetryMlExportService.exportTelemetryCsv(period: period);
   }
 }
