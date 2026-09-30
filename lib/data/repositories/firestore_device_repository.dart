@@ -63,24 +63,39 @@ class FirestoreDeviceRepository implements DeviceRepository {
     while (true) {
       bool firebaseReachable = false;
       try {
-        String url =
-            '$rtdbHost/smart_fire_detection/devices/ESP1/readings.json?orderBy="\$key"&limitToLast=1';
-
-        // Attach Firebase Auth ID token if authenticated
+        String? idToken;
         try {
-          final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
-          if (idToken != null && idToken.isNotEmpty) {
-            url += '&auth=$idToken';
-          }
+          idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
         } catch (_) {}
 
-        final response = await _dio.get(
+        String url = '$rtdbHost/devices/ESP1/readings.json?orderBy="\$key"&limitToLast=1';
+        if (idToken != null && idToken.isNotEmpty) {
+          url += '&auth=$idToken';
+        }
+
+        var response = await _dio.get(
           url,
           options: Options(
             sendTimeout: const Duration(milliseconds: 1500),
             receiveTimeout: const Duration(milliseconds: 1500),
           ),
         );
+
+        // Fallback to legacy path if primary path returns null
+        if (response.data == null || (response.data is Map && (response.data as Map).isEmpty)) {
+          String fallbackUrl =
+              '$rtdbHost/smart_fire_detection/devices/ESP1/readings.json?orderBy="\$key"&limitToLast=1';
+          if (idToken != null && idToken.isNotEmpty) {
+            fallbackUrl += '&auth=$idToken';
+          }
+          response = await _dio.get(
+            fallbackUrl,
+            options: Options(
+              sendTimeout: const Duration(milliseconds: 1500),
+              receiveTimeout: const Duration(milliseconds: 1500),
+            ),
+          );
+        }
 
         if (response.statusCode == 200 && response.data != null) {
           final dynamic data = response.data;

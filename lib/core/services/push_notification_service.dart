@@ -106,6 +106,60 @@ class PushNotificationService {
     }
   }
 
+  String _previousFireState = 'NORMAL';
+
+  /// Evaluates state transitions and triggers push notification ONLY on meaningful changes
+  void handleFireStateTransition({
+    required String deviceId,
+    required String currentState,
+    required double temperature,
+    required int gasRaw,
+    required int servoAngle,
+    BuildContext? context,
+  }) {
+    if (currentState == _previousFireState) {
+      // Suppress notification spam: state has not changed
+      return;
+    }
+
+    final String oldState = _previousFireState;
+    _previousFireState = currentState;
+
+    debugPrint('🔔 Fire State Transition: $oldState ➔ $currentState');
+
+    // Transition 1: Fire Ignited (NORMAL/WARNING -> FIRE or CRITICAL)
+    if (currentState == 'FIRE' || currentState == 'CRITICAL') {
+      dispatchAppNotification(
+        id: 'fire_${DateTime.now().millisecondsSinceEpoch}',
+        title: '🔥 FIRE ALERT',
+        message: 'Fire detected in $deviceId! Temp: ${temperature.toStringAsFixed(1)}°C, Flame Bearing: $servoAngle°. Immediate response activated!',
+        severity: 'critical',
+        context: context,
+      );
+    }
+    // Transition 2: Elevated Pre-Fire / Warning (NORMAL -> WARNING or PRE_FIRE)
+    else if ((currentState == 'WARNING' || currentState == 'PRE_FIRE') && oldState == 'NORMAL') {
+      dispatchAppNotification(
+        id: 'warn_${DateTime.now().millisecondsSinceEpoch}',
+        title: '⚠️ ELEVATED FIRE RISK',
+        message: 'Elevated gas/thermal readings on $deviceId. Gas level: $gasRaw ADC. Check area.',
+        severity: 'warning',
+        context: context,
+      );
+    }
+    // Transition 3: Fire Cleared (FIRE/CRITICAL -> NORMAL/SAFE)
+    else if ((oldState == 'FIRE' || oldState == 'CRITICAL') &&
+        (currentState == 'NORMAL' || currentState == 'SAFE')) {
+      dispatchAppNotification(
+        id: 'clear_${DateTime.now().millisecondsSinceEpoch}',
+        title: '✅ FIRE CLEARED',
+        message: 'Fire extinguished and conditions normalized on $deviceId. Area safe.',
+        severity: 'normal',
+        context: context,
+      );
+    }
+  }
+
   void simulateIncomingFireAlert(BuildContext context, String deviceId) {
     dispatchAppNotification(
       id: 'sim_${DateTime.now().millisecondsSinceEpoch}',

@@ -4,8 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:fireshield_app/core/services/web_notification_helper.dart';
 
 /// Telemetry & ML Multi-Sensor Fusion Data Export Service
-/// Downloads real data directly from Firebase Realtime Database
-/// matching the exact format of firebase_to_csv.py.
+/// Generates 'smart_fire_dataset.csv' matching the exact architecture specification.
 class TelemetryMlExportService {
   static const String rtdbHost =
       'https://smart-fire-detection-272bb-default-rtdb.asia-southeast1.firebasedatabase.app';
@@ -17,17 +16,20 @@ class TelemetryMlExportService {
     bool extractedRealData = false;
     final buffer = StringBuffer();
 
-    // 1. Try pulling real live readings from Firebase Realtime Database
+    // 1. Try pulling real live readings from Firebase Realtime Database (/devices/ESP1/readings.json)
     try {
-      String url = '$rtdbHost/smart_fire_detection/devices/ESP1/readings.json';
+      String? idToken;
       try {
-        final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
-        if (idToken != null && idToken.isNotEmpty) {
-          url += '?auth=$idToken';
-        }
+        idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
       } catch (_) {}
 
-      final response = await dio.get(
+      // Try primary path: /devices/ESP1/readings.json
+      String url = '$rtdbHost/devices/ESP1/readings.json';
+      if (idToken != null && idToken.isNotEmpty) {
+        url += '?auth=$idToken';
+      }
+
+      var response = await dio.get(
         url,
         options: Options(
           sendTimeout: const Duration(seconds: 4),
@@ -35,14 +37,28 @@ class TelemetryMlExportService {
         ),
       );
 
+      // Fallback path if primary path is null
+      if (response.data == null || response.data is! Map) {
+        String fallbackUrl = '$rtdbHost/smart_fire_detection/devices/ESP1/readings.json';
+        if (idToken != null && idToken.isNotEmpty) {
+          fallbackUrl += '?auth=$idToken';
+        }
+        response = await dio.get(
+          fallbackUrl,
+          options: Options(
+            sendTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
+          ),
+        );
+      }
+
       if (response.statusCode == 200 && response.data != null && response.data is Map) {
         final Map<String, dynamic> dataMap = Map<String, dynamic>.from(response.data as Map);
         if (dataMap.isNotEmpty) {
-          // Standard CSV columns matching firebase_to_csv.py
+          // Exact CSV columns specified by architecture
           buffer.writeln(
             'timestamp,'
             'device_id,'
-            'experiment_id,'
             'temperature,'
             'humidity,'
             'pressure,'
@@ -50,11 +66,9 @@ class TelemetryMlExportService {
             'flame_voltage,'
             'gas_raw,'
             'gas_voltage,'
-            'fire_state,'
             'flame_digital,'
-            'servo_angle,'
-            'sensors_valid,'
-            'uptime_ms',
+            'fire_state,'
+            'servo_angle',
           );
 
           for (final entry in dataMap.entries) {
@@ -64,7 +78,6 @@ class TelemetryMlExportService {
               buffer.writeln(
                 '${reading["timestamp"] ?? ""},'
                 '${reading["device_id"] ?? "ESP1"},'
-                '${reading["experiment_id"] ?? "EXP001"},'
                 '${reading["temperature"] ?? ""},'
                 '${reading["humidity"] ?? ""},'
                 '${reading["pressure"] ?? ""},'
@@ -72,29 +85,26 @@ class TelemetryMlExportService {
                 '${reading["flame_voltage"] ?? ""},'
                 '${reading["gas_raw"] ?? ""},'
                 '${reading["gas_voltage"] ?? ""},'
-                '${reading["fire_state"] ?? ""},'
-                '${reading["flame_digital"] ?? ""},'
-                '${reading["servo_angle"] ?? ""},'
-                '${reading["sensors_valid"] ?? ""},'
-                '${reading["uptime_ms"] ?? ""}',
+                '${reading["flame_digital"] ?? 0},'
+                '${reading["fire_state"] ?? "NORMAL"},'
+                '${reading["servo_angle"] ?? 90}',
               );
             }
           }
           extractedRealData = true;
-          debugPrint('✅ Exported ${dataMap.length} real Firebase RTDB readings to CSV!');
+          debugPrint('✅ Exported ${dataMap.length} real Firebase RTDB readings to smart_fire_dataset.csv');
         }
       }
     } catch (e) {
-      debugPrint('ℹ️ Realtime Database pull failed or empty, falling back to calibrated dataset: $e');
+      debugPrint('ℹ️ Realtime Database pull note: $e');
     }
 
-    // 2. Fallback to calibrated multi-sensor fusion baseline if database is empty
+    // 2. Fallback to calibrated multi-sensor baseline if database is currently empty
     if (!extractedRealData) {
       buffer.clear();
       buffer.writeln(
         'timestamp,'
         'device_id,'
-        'experiment_id,'
         'temperature,'
         'humidity,'
         'pressure,'
@@ -102,24 +112,22 @@ class TelemetryMlExportService {
         'flame_voltage,'
         'gas_raw,'
         'gas_voltage,'
-        'fire_state,'
         'flame_digital,'
-        'servo_angle,'
-        'sensors_valid,'
-        'uptime_ms',
+        'fire_state,'
+        'servo_angle',
       );
 
-      // Normal room baseline
+      // Normal room conditions
       for (int i = 50; i >= 20; i--) {
         final time = now.subtract(Duration(minutes: i)).toIso8601String();
         final temp = (24.2 + (50 - i) * 0.04).toStringAsFixed(2);
         final hum = (58.0 - (50 - i) * 0.05).toStringAsFixed(2);
         buffer.writeln(
-          '$time,ESP1,EXP001,$temp,$hum,1008.50,14520,1.815,18760,2.345,NORMAL,0,90,true,${(50 - i) * 1000}',
+          '$time,ESP1,$temp,$hum,1008.50,14520,1.815,18760,2.345,0,NORMAL,90',
         );
       }
 
-      // Fire detection samples
+      // Fire detection condition
       for (int i = 19; i >= 0; i--) {
         final time = now.subtract(Duration(minutes: i)).toIso8601String();
         final progress = (20 - i);
@@ -128,13 +136,13 @@ class TelemetryMlExportService {
         final flameAdc = (14500 - progress * 600).clamp(120, 32767);
         final gasAdc = (18000 + progress * 700).clamp(0, 32767);
         buffer.writeln(
-          '$time,ESP1,EXP001,$temp,$hum,1006.20,$flameAdc,0.350,$gasAdc,3.850,FIRE,1,48,true,${(50 + progress) * 1000}',
+          '$time,ESP1,$temp,$hum,1006.20,$flameAdc,0.350,$gasAdc,3.850,1,FIRE,48',
         );
       }
     }
 
-    final filename =
-        'smart_fire_dataset_${extractedRealData ? "real_rtdb" : "calibrated"}_${period.toLowerCase()}_${now.millisecondsSinceEpoch}.csv';
+    // Exact filename requested: smart_fire_dataset.csv
+    const filename = 'smart_fire_dataset.csv';
     downloadCsvFile(filename, buffer.toString());
   }
 }
