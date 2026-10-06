@@ -89,13 +89,26 @@ class FirestoreDeviceRepository implements DeviceRepository {
                 50.0;
             final double pres = (latestReading['pressure'] as num?)?.toDouble() ?? 1013.25;
             final int flameRaw = (latestReading['flame_raw'] as num?)?.toInt() ?? 14500;
-            final double flameV = (latestReading['flame_voltage'] as num?)?.toDouble() ?? 3.0;
+            final double flameV = (latestReading['flame_volt'] ??
+                    latestReading['flame_voltage'] as num?)
+                    ?.toDouble() ??
+                3.0;
             final int gasRaw = (latestReading['gas_raw'] as num?)?.toInt() ?? 1400;
-            final double gasV = (latestReading['gas_voltage'] as num?)?.toDouble() ?? 0.35;
+            final double gasV = (latestReading['gas_volt'] ??
+                    latestReading['gas_voltage'] as num?)
+                    ?.toDouble() ??
+                0.35;
             final int servoAngle = (latestReading['servo_angle'] as num?)?.toInt() ?? 90;
-            final String fireStateStr =
-                latestReading['fire_state']?.toString().toUpperCase() ?? 'NORMAL';
+            final String fireStateStr = (latestReading['label'] ??
+                    latestReading['fire_state'])
+                    ?.toString()
+                    .toUpperCase() ??
+                'NORMAL';
             final String deviceIdStr = latestReading['device_id']?.toString() ?? 'ESP1';
+            final String roomStr = (latestReading['room_id'] ??
+                    latestReading['room'])
+                    ?.toString() ??
+                'Living Room';
             final int rssi = (latestReading['wifi_rssi'] as num?)?.toInt() ?? -55;
             final bool valid = latestReading['sensors_valid'] as bool? ?? true;
 
@@ -121,7 +134,7 @@ class FirestoreDeviceRepository implements DeviceRepository {
             final esp1Updated = DeviceModel(
               id: deviceIdStr,
               name: 'ESP1 Detection Node',
-              room: 'Living Room',
+              room: roomStr,
               latitude: 17.3850,
               longitude: 78.4867,
               firmwareVersion: 'v2.2-RTDB',
