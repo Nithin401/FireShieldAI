@@ -598,41 +598,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: devicesAsync.when(
         data: (devices) {
           final primaryDevice = devices.firstWhere(
-            (d) => d.id == 'dev_001',
+            (d) => d.id == 'ESP1',
             orElse: () => devices.isNotEmpty
                 ? devices.first
                 : DeviceModel(
-                    id: 'dev_001',
-                    name: 'Primary Node',
-                    room: 'Kitchen',
-                    latitude: 37.77,
-                    longitude: -122.41,
-                    firmwareVersion: 'v2.0',
-                    isOnline: true,
-                    batteryLevel: 95,
-                    wifiSignalStrength: 90,
+                    id: 'ESP1',
+                    name: 'ESP1 Detection Node',
+                    room: 'Living Room',
+                    latitude: 17.3850,
+                    longitude: 78.4867,
+                    firmwareVersion: 'v2.2-RTDB',
+                    isOnline: false,
+                    batteryLevel: 100,
+                    wifiSignalStrength: 85,
                     lastSync: DateTime.now(),
                   ),
           );
 
-          bool hasFireAlert = devices.any((d) => d.fireState == 'FIRE' || d.fireState == 'HIGH_RISK');
-          int offlineCount = devices.where((d) => !d.isOnline).length;
+          bool hasFireAlert = devices.any((d) => d.fireState == 'FIRE' || d.fireState == 'CRITICAL');
+          bool hasWarningAlert = devices.any((d) => d.fireState == 'WARNING' || d.fireState == 'PRE_FIRE');
+          bool isDeviceOffline = !primaryDevice.isOnline;
+
+          // Compute exact staleness duration text
+          final secondsSinceSync = DateTime.now().difference(primaryDevice.lastSync).inSeconds.abs();
+          String stalenessText = 'Live Stream (Active)';
+          if (secondsSinceSync > 60) {
+            final mins = (secondsSinceSync / 60).floor();
+            stalenessText = 'Last updated $mins min ago';
+          } else if (secondsSinceSync > 15) {
+            stalenessText = 'Last updated ${secondsSinceSync}s ago';
+          }
 
           Color statusColor = AppColors.success;
-          String statusTitle = 'All Systems Nominal';
-          String statusSubtitle = 'Hybrid AI Risk Engine active. Continuous multi-sensor scan in progress.';
+          String statusTitle = 'SAFE • SYSTEM MONITORING';
+          String statusSubtitle = '${primaryDevice.room} [ESP1] • $stalenessText • Directional scan active';
           IconData statusIcon = Icons.verified_user;
 
           if (hasFireAlert) {
             statusColor = AppColors.error;
-            statusTitle = 'CRITICAL FIRE DETECTED';
-            statusSubtitle = 'Thermal & Flame anomaly active in ${primaryDevice.room}! Servo locked at ${primaryDevice.fireAngle}°.';
+            statusTitle = '🔥 FIRE DETECTED!';
+            statusSubtitle = 'Thermal & Flame anomaly active in ${primaryDevice.room}! Target Azimuth: ${primaryDevice.fireAngle}°';
             statusIcon = Icons.local_fire_department;
-          } else if (offlineCount > 0) {
+          } else if (hasWarningAlert) {
             statusColor = AppColors.warning;
-            statusTitle = 'System Warning';
-            statusSubtitle = '$offlineCount device(s) offline. Check network gateway.';
+            statusTitle = 'WARNING • ELEVATED READINGS';
+            statusSubtitle = 'Pre-fire or combustion gas detected in ${primaryDevice.room}. Inspect zone.';
             statusIcon = Icons.warning_amber_rounded;
+          } else if (isDeviceOffline) {
+            statusColor = Colors.blueGrey;
+            statusTitle = 'DEVICE OFFLINE';
+            statusSubtitle = 'ESP1 awaiting telemetry heartbeat • $stalenessText';
+            statusIcon = Icons.wifi_off_rounded;
           }
 
           return SafeArea(
@@ -970,9 +986,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               flex: 1,
                               child: MultiSensorGaugesCard(
                                 temperature: primaryDevice.ambientTemperature,
-                                smoke: primaryDevice.smokeRaw,
+                                humidity: primaryDevice.ambientHumidity,
+                                pressure: primaryDevice.pressure,
                                 gas: primaryDevice.gasRaw,
+                                gasVoltage: primaryDevice.gasVoltage,
                                 flameRaw: primaryDevice.flameRaw,
+                                flameVoltage: primaryDevice.flameVoltage,
                                 fireState: primaryDevice.fireState,
                               ),
                             ),
@@ -988,9 +1007,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         const SizedBox(height: 16),
                         MultiSensorGaugesCard(
                           temperature: primaryDevice.ambientTemperature,
-                          smoke: primaryDevice.smokeRaw,
+                          humidity: primaryDevice.ambientHumidity,
+                          pressure: primaryDevice.pressure,
                           gas: primaryDevice.gasRaw,
+                          gasVoltage: primaryDevice.gasVoltage,
                           flameRaw: primaryDevice.flameRaw,
+                          flameVoltage: primaryDevice.flameVoltage,
                           fireState: primaryDevice.fireState,
                         ),
                       ],

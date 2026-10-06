@@ -3,45 +3,51 @@ import 'package:fireshield_app/core/theme/app_colors.dart';
 
 class MultiSensorGaugesCard extends StatelessWidget {
   final double temperature;
-  final int smoke;
+  final double humidity;
+  final double pressure;
   final int gas;
+  final double gasVoltage;
   final int flameRaw;
+  final double flameVoltage;
   final String fireState;
 
   const MultiSensorGaugesCard({
     super.key,
     required this.temperature,
-    required this.smoke,
+    this.humidity = 50.0,
+    this.pressure = 1013.25,
     required this.gas,
+    this.gasVoltage = 0.35,
     required this.flameRaw,
+    this.flameVoltage = 3.0,
     required this.fireState,
+    int? smoke, // Optional legacy alias
   });
 
   @override
   Widget build(BuildContext context) {
-    // Temperature thresholds: <40 safe, 40-55 warning, >55 danger
-    final tempPercent = (temperature / 100.0).clamp(0.0, 1.0);
-    final tempColor = temperature > 55
+    // Temperature: <35 safe, 35-50 warning, >50 danger
+    final tempPercent = (temperature / 80.0).clamp(0.0, 1.0);
+    final tempColor = temperature > 50
         ? AppColors.error
-        : (temperature > 40 ? AppColors.warning : AppColors.success);
+        : (temperature > 35 ? AppColors.warning : AppColors.success);
 
-    // Smoke thresholds: <300 safe, 300-600 warning, >600 danger
-    final smokePercent = (smoke / 1000.0).clamp(0.0, 1.0);
-    final smokeColor = smoke > 600
-        ? AppColors.error
-        : (smoke > 300 ? AppColors.warning : AppColors.success);
+    // Humidity: 30-70 normal, <30 dry, >70 damp
+    final humPercent = (humidity / 100.0).clamp(0.0, 1.0);
 
-    // Gas thresholds: <300 safe, 300-500 warning, >500 danger
-    final gasPercent = (gas / 1000.0).clamp(0.0, 1.0);
-    final gasColor = gas > 500
+    // Gas Level (ADS1115 A1: 0 to 32767 raw)
+    // Prototype threshold: <12000 safe, 12000-18000 warning, >18000 high combustion
+    final gasPercent = (gas / 30000.0).clamp(0.0, 1.0);
+    final gasColor = gas > 18000
         ? AppColors.error
-        : (gas > 300 ? AppColors.warning : AppColors.success);
+        : (gas > 12000 ? AppColors.warning : AppColors.success);
 
-    // Flame sensor: lower raw means higher flame intensity. <300 FIRE, 300-700 WARNING, >700 SAFE
-    final flameIntensity = (1.0 - (flameRaw / 1023.0)).clamp(0.0, 1.0);
-    final flameColor = flameRaw < 300
+    // Flame IR Sensor (ADS1115 A0: 0 to 32767 raw, lower value = higher IR emission)
+    // <4000 critical flame, <8000 fire, >12000 clear ambient
+    final flameIntensity = (1.0 - (flameRaw / 25000.0)).clamp(0.0, 1.0);
+    final flameColor = flameRaw < 4000
         ? AppColors.error
-        : (flameRaw < 700 ? AppColors.warning : AppColors.success);
+        : (flameRaw < 8000 ? AppColors.error : (flameRaw < 12000 ? AppColors.warning : AppColors.success));
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -53,63 +59,80 @@ class MultiSensorGaugesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.speed, color: Color(0xFF38BDF8), size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Multi-Sensor Fleet Telemetry',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
+              const Row(
+                children: [
+                  Icon(Icons.speed, color: Color(0xFF38BDF8), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Multi-Sensor Live Telemetry (ESP1)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: Text(
+                  'ADS1115 16-Bit',
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Sensor 1: Temperature
+          // Sensor 1: Temperature (BME280)
           _buildGaugeItem(
             icon: Icons.thermostat,
-            label: 'Temperature',
+            label: 'Ambient Temperature',
             value: '${temperature.toStringAsFixed(1)} °C',
             percentage: tempPercent,
             color: tempColor,
-            thresholdText: 'Normal (<45°C) | Alarm (>55°C)',
+            thresholdText: 'Normal (<35°C) | Warning (>35°C) | Alarm (>50°C)',
           ),
           const SizedBox(height: 14),
 
-          // Sensor 2: Smoke Level
+          // Sensor 2: Relative Humidity (BME280)
           _buildGaugeItem(
-            icon: Icons.cloud,
-            label: 'Smoke Density',
-            value: '$smoke ppm',
-            percentage: smokePercent,
-            color: smokeColor,
-            thresholdText: 'Safe (<300) | Dense Smoke (>600)',
+            icon: Icons.water_drop,
+            label: 'Relative Humidity',
+            value: '${humidity.toStringAsFixed(1)} %',
+            percentage: humPercent,
+            color: const Color(0xFF38BDF8),
+            thresholdText: 'Ambient moisture | Barometric: ${pressure.toStringAsFixed(1)} hPa',
           ),
           const SizedBox(height: 14),
 
-          // Sensor 3: Gas Concentration
+          // Sensor 3: Gas & Smoke (MQ-2 on ADS1115 A1)
           _buildGaugeItem(
             icon: Icons.propane_tank,
-            label: 'Gas Level (MQ-2)',
-            value: '$gas ppm',
+            label: 'Combustion Gas (MQ-2 AO)',
+            value: '$gas (${gasVoltage.toStringAsFixed(2)} V)',
             percentage: gasPercent,
             color: gasColor,
-            thresholdText: 'Safe (<300) | Combustible (>500)',
+            thresholdText: 'Baseline (<12k) | Pre-Fire (>18k ADC)',
           ),
           const SizedBox(height: 14),
 
-          // Sensor 4: Flame IR Sensor
+          // Sensor 4: Optical Infrared Flame (KY-026 on ADS1115 A0)
           _buildGaugeItem(
             icon: Icons.local_fire_department,
-            label: 'Flame IR Intensity',
-            value: flameRaw < 300 ? 'ACTIVE FLAME ($flameRaw)' : 'Clear ($flameRaw)',
+            label: 'Optical Flame IR (KY-026 AO)',
+            value: flameRaw < 8000 ? 'ACTIVE FLAME ($flameRaw / ${flameVoltage.toStringAsFixed(2)}V)' : 'Clear ($flameRaw / ${flameVoltage.toStringAsFixed(2)}V)',
             percentage: flameIntensity,
             color: flameColor,
-            thresholdText: 'IR Detection Range: 760nm - 1100nm',
+            thresholdText: 'IR Band: 760–1100 nm | Threshold: <8,000 ADC',
           ),
         ],
       ),
@@ -155,7 +178,6 @@ class MultiSensorGaugesCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        // Progress Bar
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: Container(
