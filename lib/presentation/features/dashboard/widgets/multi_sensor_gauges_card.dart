@@ -35,19 +35,20 @@ class MultiSensorGaugesCard extends StatelessWidget {
     // Humidity: 30-70 normal, <30 dry, >70 damp
     final humPercent = (humidity / 100.0).clamp(0.0, 1.0);
 
-    // Gas Level (ADS1115 A1: 0 to 32767 raw)
-    // Prototype threshold: <12000 safe, 12000-18000 warning, >18000 high combustion
-    final gasPercent = (gas / 30000.0).clamp(0.0, 1.0);
-    final gasColor = gas > 18000
-        ? AppColors.error
-        : (gas > 12000 ? AppColors.warning : AppColors.success);
+    // Gas / Smoke Level (supports ESP8266 digital smoke or analog gas)
+    final isDigitalSmoke = gas <= 1;
+    final smokePercent = isDigitalSmoke ? (gas == 1 ? 1.0 : 0.0) : (gas / 30000.0).clamp(0.0, 1.0);
+    final gasColor = isDigitalSmoke
+        ? (gas == 1 ? AppColors.error : AppColors.success)
+        : (gas > 18000 ? AppColors.error : (gas > 12000 ? AppColors.warning : AppColors.success));
 
-    // Flame IR Sensor (ADS1115 A0: 0 to 32767 raw, lower value = higher IR emission)
-    // <4000 critical flame, <8000 fire, >12000 clear ambient
-    final flameIntensity = (1.0 - (flameRaw / 25000.0)).clamp(0.0, 1.0);
-    final flameColor = flameRaw < 4000
-        ? AppColors.error
-        : (flameRaw < 8000 ? AppColors.error : (flameRaw < 12000 ? AppColors.warning : AppColors.success));
+    // Flame IR Sensor: ESP8266 10-bit A0 range (0-1024, threshold < 600) vs ADS1115 (0-32767)
+    final isEsp10Bit = flameRaw <= 1024;
+    final flameThreshold = isEsp10Bit ? 600 : 8000;
+    final flameMax = isEsp10Bit ? 1024.0 : 25000.0;
+    final flameDetected = flameRaw < flameThreshold;
+    final flameIntensity = (1.0 - (flameRaw / flameMax)).clamp(0.0, 1.0);
+    final flameColor = flameDetected ? AppColors.error : AppColors.success;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -84,7 +85,7 @@ class MultiSensorGaugesCard extends StatelessWidget {
                   border: Border.all(color: const Color(0xFF334155)),
                 ),
                 child: Text(
-                  'ADS1115 16-Bit',
+                  isEsp10Bit ? 'ESP8266 10-Bit Telemetry' : 'ADS1115 16-Bit',
                   style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
                 ),
               ),
@@ -92,7 +93,7 @@ class MultiSensorGaugesCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Sensor 1: Temperature (BME280)
+          // Sensor 1: Temperature (DHT11 / Ambient)
           _buildGaugeItem(
             icon: Icons.thermostat,
             label: 'Ambient Temperature',
@@ -103,36 +104,44 @@ class MultiSensorGaugesCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // Sensor 2: Relative Humidity (BME280)
+          // Sensor 2: Relative Humidity (DHT11)
           _buildGaugeItem(
             icon: Icons.water_drop,
             label: 'Relative Humidity',
             value: '${humidity.toStringAsFixed(1)} %',
             percentage: humPercent,
             color: const Color(0xFF38BDF8),
-            thresholdText: 'Ambient moisture | Barometric: ${pressure.toStringAsFixed(1)} hPa',
+            thresholdText: 'Ambient moisture (0–100%)',
           ),
           const SizedBox(height: 14),
 
-          // Sensor 3: Gas & Smoke (MQ-2 on ADS1115 A1)
+          // Sensor 3: Smoke / Gas
           _buildGaugeItem(
-            icon: Icons.propane_tank,
-            label: 'Combustion Gas (MQ-2 AO)',
-            value: '$gas (${gasVoltage.toStringAsFixed(2)} V)',
-            percentage: gasPercent,
+            icon: Icons.smoke_free,
+            label: isDigitalSmoke ? 'Smoke Detector (DO GPIO12)' : 'Combustion Gas (MQ-2 AO)',
+            value: isDigitalSmoke
+                ? (gas == 1 ? 'SMOKE DETECTED' : 'Clean (No Smoke)')
+                : '$gas (${gasVoltage.toStringAsFixed(2)} V)',
+            percentage: smokePercent,
             color: gasColor,
-            thresholdText: 'Baseline (<12k) | Pre-Fire (>18k ADC)',
+            thresholdText: isDigitalSmoke
+                ? 'Digital DO: 1 = Smoke (LOW active), 0 = Clean'
+                : 'Baseline (<12k) | Pre-Fire (>18k ADC)',
           ),
           const SizedBox(height: 14),
 
-          // Sensor 4: Optical Infrared Flame (KY-026 on ADS1115 A0)
+          // Sensor 4: Optical Infrared Flame (KY-026 on A0)
           _buildGaugeItem(
             icon: Icons.local_fire_department,
-            label: 'Optical Flame IR (KY-026 AO)',
-            value: flameRaw < 8000 ? 'ACTIVE FLAME ($flameRaw / ${flameVoltage.toStringAsFixed(2)}V)' : 'Clear ($flameRaw / ${flameVoltage.toStringAsFixed(2)}V)',
+            label: 'Optical Flame IR (A0)',
+            value: flameDetected
+                ? 'ACTIVE FLAME ($flameRaw / ${flameVoltage.toStringAsFixed(2)}V)'
+                : 'Clear ($flameRaw / ${flameVoltage.toStringAsFixed(2)}V)',
             percentage: flameIntensity,
             color: flameColor,
-            thresholdText: 'IR Band: 760–1100 nm | Threshold: <8,000 ADC',
+            thresholdText: isEsp10Bit
+                ? 'ESP8266 A0 (0–1024) | Threshold: <600 (Flame)'
+                : 'IR Band: 760–1100 nm | Threshold: <8,000 ADC',
           ),
         ],
       ),

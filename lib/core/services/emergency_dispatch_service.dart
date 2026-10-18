@@ -26,7 +26,8 @@ class EmergencyDispatchService {
   String userEmail = 'user.safety@fireshield.ai';
   String userPhone = '+1 555-0199';
   String fireSafetyPhone = '101'; // Default Fire Safety Department (101 in India, 911 in US)
-  bool autoDispatchEnabled = true;
+  // Sending a real SMS or placing a call must always be an explicit opt-in.
+  bool autoDispatchEnabled = false;
 
   Timer? _escalationTimer;
   int _totalElapsedSeconds = 0;
@@ -47,7 +48,7 @@ class EmergencyDispatchService {
       userEmail = prefs.getString('emergency_email') ?? userEmail;
       userPhone = prefs.getString('emergency_phone') ?? userPhone;
       fireSafetyPhone = prefs.getString('fire_safety_phone') ?? fireSafetyPhone;
-      autoDispatchEnabled = prefs.getBool('auto_dispatch_alerts') ?? true;
+      autoDispatchEnabled = prefs.getBool('auto_dispatch_alerts') ?? false;
       debugPrint('ℹ️ Emergency Contacts initialized: $userEmail | $userPhone | Fire Dept: $fireSafetyPhone');
     } catch (_) {}
   }
