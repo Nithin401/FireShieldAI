@@ -10,6 +10,7 @@ import 'package:fireshield_app/presentation/features/dashboard/widgets/sensor_ca
 import 'package:fireshield_app/presentation/features/dashboard/widgets/directional_radar_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/multi_sensor_gauges_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/simulation_controls_card.dart';
+import 'package:fireshield_app/presentation/features/dashboard/widgets/room_adaptive_risk_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/live_alerts_feed_card.dart';
 import 'package:fireshield_app/presentation/features/dashboard/widgets/ai_emergency_call_dialog.dart';
 import 'package:fireshield_app/core/services/emergency_dispatch_service.dart';
@@ -959,6 +960,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                         ),
                       ],
+
+                      // 1.3 Room-Adaptive Risk Engine & Push Notification Center
+                      const RoomAdaptiveRiskCard(),
 
                       // 2. Event Simulation Injector Bar
                       SimulationControlsCard(

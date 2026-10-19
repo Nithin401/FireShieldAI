@@ -32,9 +32,9 @@ class FlaskApiService {
       final host = Uri.base.host.isNotEmpty ? Uri.base.host : '127.0.0.1';
       return 'http://$host:5000';
     }
-    // Android emulator alias for host machine localhost
+    // Physical Android phones and emulator fallback
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:5000';
+      return 'http://192.168.29.2:5000';
     }
     return 'http://127.0.0.1:5000';
   }
@@ -137,5 +137,97 @@ class FlaskApiService {
       debugPrint('FlaskApiService.getBaseline error: $e');
     }
     return null;
+  }
+
+  /// GET /api/risk/current - Evaluates current risk state (NORMAL, BASELINE_ANOMALY, EARLY_WARNING, HARDWARE_FIRE_ALERT, SENSOR_OR_DATA_FAULT)
+  Future<Map<String, dynamic>?> getCurrentRisk() async {
+    try {
+      final response = await _dio.get('/api/risk/current');
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.getCurrentRisk error: $e');
+    }
+    return null;
+  }
+
+  /// GET /api/events - Retrieve persistent event history from SQLite
+  Future<List<Map<String, dynamic>>> getEvents({int limit = 20, String? eventType}) async {
+    try {
+      final response = await _dio.get(
+        '/api/events',
+        queryParameters: {
+          'limit': limit,
+          'event_type': ?eventType,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final events = data['events'];
+        if (events is List) {
+          return events.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.getEvents error: $e');
+    }
+    return [];
+  }
+
+  /// GET /api/notifications/status
+  Future<Map<String, dynamic>?> getNotificationStatus() async {
+    try {
+      final response = await _dio.get('/api/notifications/status');
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.getNotificationStatus error: $e');
+    }
+    return null;
+  }
+
+  /// GET /api/notifications/vapid-public-key
+  Future<String?> getVapidPublicKey() async {
+    try {
+      final response = await _dio.get('/api/notifications/vapid-public-key');
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data['public_key'] as String?;
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.getVapidPublicKey error: $e');
+    }
+    return null;
+  }
+
+  /// POST /api/notifications/subscribe
+  Future<bool> subscribeWebPush(Map<String, dynamic> subscriptionJson) async {
+    try {
+      final response = await _dio.post(
+        '/api/notifications/subscribe',
+        data: subscriptionJson,
+      );
+      return response.statusCode == 201 || response.statusCode == 200;
+    } catch (e) {
+      debugPrint('FlaskApiService.subscribeWebPush error: $e');
+      return false;
+    }
+  }
+
+  /// POST /api/notifications/test
+  Future<bool> sendTestNotification(String channel) async {
+    try {
+      final response = await _dio.post(
+        '/api/notifications/test',
+        data: {'channels': [channel]},
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return response.data['success'] == true;
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.sendTestNotification error: $e');
+    }
+    return false;
   }
 }
