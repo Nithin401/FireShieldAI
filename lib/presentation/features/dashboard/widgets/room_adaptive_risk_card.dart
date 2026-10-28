@@ -248,6 +248,24 @@ class _NotificationSetupSheetState extends State<_NotificationSetupSheet> {
     }
   }
 
+  Future<void> _triggerVoiceTestCall() async {
+    setState(() => _testMessage = '⏳ Requesting test voice call...');
+    final res = await FlaskApiService().triggerTestVoiceCall();
+    if (mounted) {
+      setState(() {
+        if (res != null && res['success'] == true) {
+          final isDryRun = res['is_dry_run'] == true;
+          _testMessage = isDryRun
+              ? '✅ Simulated Voice Call Accepted (Dry-Run: ${res['provider_call_sid']})'
+              : '📞 Live Voice Call Dispatched! (CallSid: ${res['provider_call_sid']})';
+        } else {
+          _testMessage = '❌ Voice call failed: ${res?['error'] ?? 'Unknown error'}';
+        }
+      });
+      _loadData();
+    }
+  }
+
   Future<void> _openNtfyTopic(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (mounted) {
@@ -345,6 +363,47 @@ class _NotificationSetupSheetState extends State<_NotificationSetupSheet> {
                         onPressed: () => _triggerTestAlert('ntfy'),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Card 2: Automated Outbound Voice Calls (Exotel)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.phone_in_talk, color: Colors.orangeAccent, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '2. Automated Outbound Phone Calls (Exotel)',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Automatically initiates a phone call with spoken fire alert upon critical hazard detection. Operates in zero-cost Dry-Run mode by default.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orangeAccent,
+                      side: const BorderSide(color: Colors.orangeAccent),
+                    ),
+                    icon: const Icon(Icons.call, size: 16),
+                    label: const Text('Test Phone Call', style: TextStyle(fontSize: 12)),
+                    onPressed: _triggerVoiceTestCall,
                   ),
                 ],
               ),

@@ -230,4 +230,35 @@ class FlaskApiService {
     }
     return false;
   }
+
+  /// GET /api/voice/status - Exotel Voice Call & Provider Configuration
+  Future<Map<String, dynamic>?> getVoiceStatus() async {
+    try {
+      final response = await _dio.get('/api/voice/status');
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.getVoiceStatus error: $e');
+    }
+    return null;
+  }
+
+  /// POST /api/voice/test-call - Trigger an authorized test phone call
+  Future<Map<String, dynamic>?> triggerTestVoiceCall({String? phone}) async {
+    try {
+      final response = await _dio.post(
+        '/api/voice/test-call',
+        data: {
+          'phone': ?phone,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.triggerTestVoiceCall error: $e');
+    }
+    return null;
+  }
 }
