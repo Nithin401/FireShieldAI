@@ -23,8 +23,8 @@ class EmergencyDispatchService {
   EmergencyDispatchService._internal();
 
   final Dio _dio = Dio();
-  String userEmail = 'user.safety@fireshield.ai';
-  String userPhone = '+1 555-0199';
+  String userEmail = 'nithinvarmanampally@gmail.com';
+  String userPhone = '+91 9398288263';
   String fireSafetyPhone = '101'; // Default Fire Safety Department (101 in India, 911 in US)
   // Sending a real SMS or placing a call must always be an explicit opt-in.
   bool autoDispatchEnabled = false;
@@ -39,8 +39,7 @@ class EmergencyDispatchService {
 
   final Set<String> _dispatchedEvents = {};
 
-  bool get isCustomContactConfigured =>
-      userEmail != 'user.safety@fireshield.ai' || userPhone != '+1 555-0199';
+  bool get isCustomContactConfigured => userEmail.isNotEmpty && userPhone.isNotEmpty;
 
   Future<void> initialize() async {
     try {

@@ -1,16 +1,25 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fireshield_app/core/services/flask_api_service.dart';
 import 'package:fireshield_app/domain/models/device_model.dart';
 import 'package:fireshield_app/domain/repositories/device_repository.dart';
 
-/// Concrete DeviceRepository implementation fetching real ThingSpeak readings via Flask API.
+/// Concrete DeviceRepository implementation fetching real ThingSpeak readings via Flask API,
+/// with automatic direct ThingSpeak HTTPS fallback when Flask backend is not reachable.
 /// Avoids Firebase completely and maintains strictly local/ThingSpeak telemetry.
 class FlaskDeviceRepository implements DeviceRepository {
   FlaskDeviceRepository({FlaskApiService? apiService})
-      : _api = apiService ?? FlaskApiService();
+      : _api = apiService ?? FlaskApiService(),
+        _thingSpeakDio = Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
+          ),
+        );
 
   final FlaskApiService _api;
+  final Dio _thingSpeakDio;
 
   final List<DeviceModel> _devices = [
     DeviceModel(
@@ -42,40 +51,72 @@ class FlaskDeviceRepository implements DeviceRepository {
 
   @override
   Stream<List<DeviceModel>> getDevices() async* {
-    // Attempt initial fetch immediately
+    await _pollTelemetry();
+    yield List<DeviceModel>.from(_devices);
+
+    while (true) {
+      await Future.delayed(const Duration(seconds: 4));
+      await _pollTelemetry();
+      yield List<DeviceModel>.from(_devices);
+    }
+  }
+
+  Future<void> _pollTelemetry() async {
+    bool success = false;
+    // 1. Try Flask Backend first (contains rich baseline & risk calculations)
     try {
       final res = await _api.getLatestReading();
       if (res != null && res['success'] == true && res['reading'] != null) {
         final reading = Map<String, dynamic>.from(res['reading'] as Map);
         _updateFromReading(reading);
+        success = true;
       }
     } catch (e) {
-      debugPrint('FlaskDeviceRepository initial poll: $e');
+      debugPrint('Flask backend unavailable, attempting direct ThingSpeak fallback: $e');
     }
 
-    yield List<DeviceModel>.from(_devices);
-
-    while (true) {
-      await Future.delayed(const Duration(seconds: 4));
+    // 2. If Flask is not running, fall back directly to ThingSpeak channel 3534677 over HTTPS!
+    if (!success) {
       try {
-        final res = await _api.getLatestReading();
-        if (res != null && res['success'] == true && res['reading'] != null) {
-          final reading = Map<String, dynamic>.from(res['reading'] as Map);
-          _updateFromReading(reading);
-        } else {
-          // If response unavailable, mark device as offline/stale
-          if (_devices.isNotEmpty) {
-            _devices[0] = _devices[0].copyWith(
-              isOnline: false,
-              sensorsValid: false,
-            );
+        final resp = await _thingSpeakDio.get(
+          'https://api.thingspeak.com/channels/3534677/feeds/last.json',
+          queryParameters: {'api_key': 'KGGT6DMKNSCA6FS6'},
+        );
+        if (resp.statusCode == 200 && resp.data is Map) {
+          final feed = Map<String, dynamic>.from(resp.data as Map);
+          if (feed.containsKey('field1') || feed.containsKey('field3')) {
+            final flameRaw = int.tryParse(feed['field1']?.toString() ?? '') ?? 1024;
+            final smokeStatus = int.tryParse(feed['field2']?.toString() ?? '') ?? 0;
+            final temp = double.tryParse(feed['field3']?.toString() ?? '') ?? 25.0;
+            final hum = double.tryParse(feed['field4']?.toString() ?? '') ?? 50.0;
+            final servo = int.tryParse(feed['field5']?.toString() ?? '') ?? 90;
+            final fireStatus = int.tryParse(feed['field6']?.toString() ?? '') ?? 0;
+
+            final simulatedReading = {
+              'flame_raw': flameRaw,
+              'smoke_status': smokeStatus,
+              'temperature_c': temp,
+              'humidity_pct': hum,
+              'servo_angle': servo,
+              'fire_status': fireStatus,
+              'is_stale': false,
+              'created_at': feed['created_at'],
+            };
+            _updateFromReading(simulatedReading);
+            success = true;
+            debugPrint('✅ Direct ThingSpeak telemetry successfully retrieved in Flutter app!');
           }
         }
-      } catch (e) {
-        debugPrint('FlaskDeviceRepository poll error: $e');
+      } catch (tsErr) {
+        debugPrint('Direct ThingSpeak fallback also unavailable: $tsErr');
       }
+    }
 
-      yield List<DeviceModel>.from(_devices);
+    if (!success && _devices.isNotEmpty) {
+      _devices[0] = _devices[0].copyWith(
+        isOnline: false,
+        sensorsValid: false,
+      );
     }
   }
 

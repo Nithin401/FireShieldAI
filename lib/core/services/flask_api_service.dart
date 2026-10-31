@@ -261,4 +261,71 @@ class FlaskApiService {
     }
     return null;
   }
+
+  /// POST /api/voice/call-now - Immediately trigger an outbound emergency voice call
+  Future<Map<String, dynamic>?> triggerCallNow({String? phone, String? reason}) async {
+    try {
+      final response = await _dio.post(
+        '/api/voice/call-now',
+        data: {
+          'phone': ?phone,
+          'reason': reason ?? 'Emergency Call Initiated from Flutter App',
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.triggerCallNow error: $e');
+    }
+    return null;
+  }
+
+  /// POST /api/voice/terminate - End an active voice call
+  Future<bool> terminateVoiceCall({String? callId}) async {
+    try {
+      final response = await _dio.post(
+        '/api/voice/terminate',
+        data: {
+          if (callId != null) 'call_id': callId,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('FlaskApiService.terminateVoiceCall error: $e');
+      return false;
+    }
+  }
+
+  /// POST /api/voice/contact - Update primary emergency contact number
+  Future<Map<String, dynamic>?> updateEmergencyContact(String phone) async {
+    try {
+      final response = await _dio.post(
+        '/api/voice/contact',
+        data: {'phone': phone},
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (e) {
+      debugPrint('FlaskApiService.updateEmergencyContact error: $e');
+    }
+    return null;
+  }
+
+  /// POST /api/voice/send-sms - Trigger an emergency SMS text alert
+  Future<bool> sendEmergencySms({String? phone}) async {
+    try {
+      final response = await _dio.post(
+        '/api/voice/send-sms',
+        data: {
+          if (phone != null) 'phone': phone,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('FlaskApiService.sendEmergencySms error: $e');
+      return false;
+    }
+  }
 }
