@@ -64,13 +64,32 @@ class _RoomAdaptiveRiskCardState extends State<RoomAdaptiveRiskCard> {
 
     final tempRate = metrics['temp_rate_c_min'] as num?;
     final tempDev = metrics['temp_deviation'] as num?;
+    final confidence = metrics['confidence_score'] as num?;
+    final dualConfirmed = metrics['dual_sensor_confirmed'] == true;
+    final isHumDropping = metrics['is_hum_dropping'] == true;
+    final shouldPhoneCall = metrics['should_phone_call'] == true;
 
     Color cardBorder;
     Color cardBg;
     IconData stateIcon;
     String title;
 
-    if (riskState == 'HARDWARE_FIRE_ALERT') {
+    if (riskState == 'CONFIRMED_FIRE_ALERT') {
+      cardBorder = AppColors.error;
+      cardBg = const Color(0xFF2D1217);
+      stateIcon = Icons.local_fire_department;
+      title = '🚨 CONFIRMED FIRE (Multi-Sensor Verified)';
+    } else if (riskState == 'DUAL_SENSOR_ALERT') {
+      cardBorder = AppColors.error;
+      cardBg = const Color(0xFF2D1217);
+      stateIcon = Icons.local_fire_department;
+      title = '🔥 DUAL-SENSOR FIRE ALERT (Flame + Smoke)';
+    } else if (riskState == 'SINGLE_SENSOR_SUSPECT') {
+      cardBorder = Colors.amber;
+      cardBg = const Color(0xFF261D0C);
+      stateIcon = Icons.report_problem_rounded;
+      title = '⚠️ SUSPECTED FALSE ALARM (Single Sensor)';
+    } else if (riskState == 'HARDWARE_FIRE_ALERT') {
       cardBorder = AppColors.error;
       cardBg = const Color(0xFF2D1217);
       stateIcon = Icons.local_fire_department;
@@ -160,24 +179,45 @@ class _RoomAdaptiveRiskCardState extends State<RoomAdaptiveRiskCard> {
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 10),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
             children: [
-              if (tempRate != null) ...[
+              if (confidence != null)
+                _buildMetricPill(
+                  label: 'Confidence',
+                  value: '${confidence.toInt()}%',
+                  color: confidence >= 70 ? AppColors.error : (confidence >= 35 ? Colors.amber : const Color(0xFF94A3B8)),
+                ),
+              _buildMetricPill(
+                label: 'Dual Sensor',
+                value: dualConfirmed ? 'CONFIRMED' : (riskState == 'SINGLE_SENSOR_SUSPECT' ? 'SINGLE ONLY' : 'NORMAL'),
+                color: dualConfirmed ? AppColors.error : (riskState == 'SINGLE_SENSOR_SUSPECT' ? Colors.amber : const Color(0xFF94A3B8)),
+              ),
+              if (riskState == 'SINGLE_SENSOR_SUSPECT' || shouldPhoneCall)
+                _buildMetricPill(
+                  label: 'Phone Call',
+                  value: shouldPhoneCall ? 'QUEUED' : 'WITHHELD',
+                  color: shouldPhoneCall ? AppColors.error : Colors.amber,
+                ),
+              if (tempRate != null)
                 _buildMetricPill(
                   label: 'Rise Rate',
                   value: '${tempRate > 0 ? "+" : ""}${tempRate.toStringAsFixed(2)} °C/min',
                   color: tempRate >= 1.5 ? Colors.orangeAccent : const Color(0xFF94A3B8),
                 ),
-                const SizedBox(width: 8),
-              ],
-              if (tempDev != null) ...[
+              if (isHumDropping)
+                _buildMetricPill(
+                  label: 'Air Drying',
+                  value: 'ACTIVE',
+                  color: Colors.orangeAccent,
+                ),
+              if (tempDev != null)
                 _buildMetricPill(
                   label: 'Baseline Dev',
                   value: '${tempDev > 0 ? "+" : ""}${tempDev.toStringAsFixed(1)} °C',
                   color: tempDev.abs() >= 2.5 ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
                 ),
-                const SizedBox(width: 8),
-              ],
               _buildMetricPill(
                 label: 'Severity',
                 value: severity.toString().toUpperCase(),
